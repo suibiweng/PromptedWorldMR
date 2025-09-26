@@ -18943,7 +18943,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e2c6a4f52c2415d40a29132fa83a75c8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  openAIApiKey: ***REMOVED***
+  openAIApiKey: 
   model: gpt-4.1-mini
 --- !u!4 &578307420
 Transform:
