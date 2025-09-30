@@ -8,6 +8,15 @@ public class ChatDemo : MonoBehaviour
     public TMP_Text outputText;
     public RawImage imagePreview; // optional
 
+
+    public void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.F1))
+        {
+            OnSendPrompt();
+        }
+    }
+
     public async void OnSendPrompt()
     {
         string prompt = promptInput.text;
