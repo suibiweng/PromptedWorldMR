@@ -1,29 +1,8 @@
 using System;
 using MoonSharp.Interpreter;
 using UnityEngine;
-using LuaProxies; // your proxy namespace
-using MoonSharp.Interpreter.Interop;
+using LuaProxies; // delete if your proxies have no namespace
 
-
-/// <summary>
-/// Runtime-only Lua behaviour for Quest/IL2CPP.
-/// Attach to a GameObject. Provide script via Inline or TextAsset,
-/// or call LoadScript(string code) at runtime.
-/// 
-/// Lua lifecycle (all optional):
-///   start(self)
-///   update(self, dt)
-///   on_collision(self, collision)    -- CollisionProxy
-///   on_trigger(self, otherGO)        -- GameObjectProxy
-/// 
-/// self table exposes:
-///   self.gameObject  -> GameObjectProxy
-///   self.transform   -> TransformProxy
-///   self.rigidbody   -> RigidbodyProxy (if found)
-///   self.particle    -> ParticleSystemProxy (first on GO/children)
-///   self.audio       -> AudioSourceProxy (if found)
-///   self.animator    -> AnimatorProxy (if found)
-/// </summary>
 [DisallowMultipleComponent]
 public class LuaBehaviour : MonoBehaviour
 {
@@ -32,17 +11,15 @@ public class LuaBehaviour : MonoBehaviour
     public TextAsset scriptAsset;
     public bool runOnStart = true;
 
-    // MoonSharp state
     Script _script;
     Table _self;
     DynValue _fnStart, _fnUpdate, _fnOnCollision, _fnOnTrigger;
 
     void Awake()
     {
-        // Create VM (safe preset) and register proxies
         _script = new Script(CoreModules.Preset_Default);
-        UserData.RegistrationPolicy = InteropRegistrationPolicy.Default;
 
+        // Register proxies
         UserData.RegisterType<GameObjectProxy>();
         UserData.RegisterType<TransformProxy>();
         UserData.RegisterType<RigidbodyProxy>();
@@ -53,7 +30,11 @@ public class LuaBehaviour : MonoBehaviour
         UserData.RegisterType<ButtonProxy>();
         UserData.RegisterType<CollisionProxy>();
 
-        // Small stdlib helpers
+        // DOTween bridge
+        UserData.RegisterType<LuaDOTween>();
+        _script.Globals["dotween"] = new LuaDOTween();
+
+        // Helpers
         _script.Globals["log"] = (Action<string>)((s) => Debug.Log($"[Lua] {s}"));
         _script.Globals["warn"] = (Action<string>)((s) => Debug.LogWarning($"[Lua] {s}"));
         _script.Globals["error"] = (Action<string>)((s) => Debug.LogError($"[Lua] {s}"));
@@ -64,20 +45,19 @@ public class LuaBehaviour : MonoBehaviour
             return go ? new GameObjectProxy(go) : null;
         });
 
-        // Build self table with your proxies
+        // self table
         _self = DynValue.NewTable(_script).Table;
         var goProxy = new GameObjectProxy(gameObject);
         _self["gameObject"] = UserData.Create(goProxy);
-        _self["transform"]  = UserData.Create(goProxy.GetTransformProxy()); // always exists on GO
+        _self["transform"]  = UserData.Create(goProxy.GetTransformProxy());
 
-        var rbProxy = goProxy.GetRigidbodyProxy(); if (rbProxy != null) _self["rigidbody"] = UserData.Create(rbProxy); // :contentReference[oaicite:4]{index=4}
-        var psProxy = goProxy.GetParticleSystemProxy(); if (psProxy != null) _self["particle"] = UserData.Create(psProxy); // :contentReference[oaicite:5]{index=5}
-        var audioProxy = goProxy.GetAudioSourceProxy(); if (audioProxy != null) _self["audio"] = UserData.Create(audioProxy); // :contentReference[oaicite:6]{index=6}
-        var animatorProxy = goProxy.GetAnimatorProxy(); if (animatorProxy != null) _self["animator"] = UserData.Create(animatorProxy); // :contentReference[oaicite:7]{index=7}
+        var rbProxy = goProxy.GetRigidbodyProxy();   if (rbProxy != null)   _self["rigidbody"] = UserData.Create(rbProxy);
+        var psProxy = goProxy.GetParticleSystemProxy(); if (psProxy != null) _self["particle"]  = UserData.Create(psProxy);
+        var audioProxy = goProxy.GetAudioSourceProxy(); if (audioProxy != null) _self["audio"] = UserData.Create(audioProxy);
+        var animatorProxy = goProxy.GetAnimatorProxy(); if (animatorProxy != null) _self["animator"] = UserData.Create(animatorProxy);
 
         _script.Globals["self"] = _self;
 
-        // Load initial script from asset or inline
         string src = scriptAsset != null ? scriptAsset.text : (inlineScript ?? string.Empty);
         CompileBind(src);
     }
@@ -92,10 +72,7 @@ public class LuaBehaviour : MonoBehaviour
         if (_fnUpdate != null && _fnUpdate.Type == DataType.Function)
         {
             try { _script.Call(_fnUpdate, _self, DynValue.NewNumber(Time.deltaTime)); }
-            catch (ScriptRuntimeException ex)
-            {
-                Debug.LogError($"[Lua] update() error on '{name}': {ex.DecoratedMessage}");
-            }
+            catch (ScriptRuntimeException ex) { Debug.LogError($"[Lua] update() error on '{name}': {ex.DecoratedMessage}"); }
         }
     }
 
@@ -104,13 +81,10 @@ public class LuaBehaviour : MonoBehaviour
         if (_fnOnCollision == null || _fnOnCollision.Type != DataType.Function) return;
         try
         {
-            var colProxy = new CollisionProxy(collision); // GetName/GetContactPoint/GetRigidbodyProxy etc. :contentReference[oaicite:8]{index=8}
+            var colProxy = new CollisionProxy(collision);
             _script.Call(_fnOnCollision, _self, UserData.Create(colProxy));
         }
-        catch (ScriptRuntimeException ex)
-        {
-            Debug.LogError($"[Lua] on_collision() error on '{name}': {ex.DecoratedMessage}");
-        }
+        catch (ScriptRuntimeException ex) { Debug.LogError($"[Lua] on_collision() error on '{name}': {ex.DecoratedMessage}"); }
     }
 
     void OnTriggerEnter(Collider other)
@@ -121,32 +95,22 @@ public class LuaBehaviour : MonoBehaviour
             var otherProxy = new GameObjectProxy(other.gameObject);
             _script.Call(_fnOnTrigger, _self, UserData.Create(otherProxy));
         }
-        catch (ScriptRuntimeException ex)
-        {
-            Debug.LogError($"[Lua] on_trigger() error on '{name}': {ex.DecoratedMessage}");
-        }
+        catch (ScriptRuntimeException ex) { Debug.LogError($"[Lua] on_trigger() error on '{name}': {ex.DecoratedMessage}"); }
     }
 
-    // --- Public runtime API ---
-
-    /// <summary>Replace the current script at runtime (e.g., from network/UI) and (optionally) call start().</summary>
     public void LoadScript(string code, bool callStart = true)
     {
         CompileBind(code ?? string.Empty);
         if (callStart) SafeCall(_fnStart);
     }
 
-    // --- Internals ---
-
     void CompileBind(string src)
     {
         try
         {
-            // Recreate a clean script state but keep the same self table & helpers
             _script = new Script(CoreModules.Preset_Default);
-            UserData.RegistrationPolicy = InteropRegistrationPolicy.Default;
 
-            // re-register proxies & helpers
+            // Re-register proxies
             UserData.RegisterType<GameObjectProxy>();
             UserData.RegisterType<TransformProxy>();
             UserData.RegisterType<RigidbodyProxy>();
@@ -157,6 +121,11 @@ public class LuaBehaviour : MonoBehaviour
             UserData.RegisterType<ButtonProxy>();
             UserData.RegisterType<CollisionProxy>();
 
+            // DOTween bridge (again, after VM rebuild)
+            UserData.RegisterType<LuaDOTween>();
+            _script.Globals["dotween"] = new LuaDOTween();
+
+            // Helpers
             _script.Globals["log"] = (Action<string>)((s) => Debug.Log($"[Lua] {s}"));
             _script.Globals["warn"] = (Action<string>)((s) => Debug.LogWarning($"[Lua] {s}"));
             _script.Globals["error"] = (Action<string>)((s) => Debug.LogError($"[Lua] {s}"));
@@ -167,7 +136,7 @@ public class LuaBehaviour : MonoBehaviour
                 return go ? new GameObjectProxy(go) : null;
             });
 
-            _script.Globals["self"] = _self; // reuse existing proxies bound in Awake()
+            _script.Globals["self"] = _self;
 
             _script.DoString(src);
 
@@ -192,9 +161,6 @@ public class LuaBehaviour : MonoBehaviour
     {
         if (fn == null || fn.Type != DataType.Function) return;
         try { _script.Call(fn, _self); }
-        catch (ScriptRuntimeException ex)
-        {
-            Debug.LogError($"[Lua] Error on '{name}': {ex.DecoratedMessage}");
-        }
+        catch (ScriptRuntimeException ex) { Debug.LogError($"[Lua] Error on '{name}': {ex.DecoratedMessage}"); }
     }
 }
