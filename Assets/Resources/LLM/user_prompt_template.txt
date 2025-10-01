@@ -1,0 +1,13 @@
+Task: Generate Lua that controls a Unity GameObject using MoonSharp + DOTween proxies.
+GameObject display name: {OBJECT_NAME}
+
+User intent:
+{INTENT}
+
+Constraints:
+- Output ONLY Lua. No markdown, no explanations.
+- Functions required: start(), update(deltaTime), on_trigger(), on_collision(col).
+- Use dotween:MoveTo/RotateTo/ScaleTo with self.transform. Example:
+--   local h = dotween:MoveTo(self.transform, 0,1,0, 1.2, 'OutQuad')
+- Use update(deltaTime) for continuous motion; use on_trigger() for one-shot play.
+- Avoid Time.deltaTime; use the provided deltaTime parameter.

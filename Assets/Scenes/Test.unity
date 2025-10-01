@@ -252,8 +252,9 @@ GameObject:
   - component: {fileID: 401068086}
   - component: {fileID: 401068085}
   - component: {fileID: 401068084}
+  - component: {fileID: 401068088}
   m_Layer: 5
-  m_Name: Canvas
+  m_Name: TestUI
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -344,6 +345,28 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!114 &401068088
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 401068083}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 883089314e1975d49a8cbecdaadea707, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  generator: {fileID: 738435283}
+  objectNameInput: {fileID: 0}
+  promptInput: {fileID: 0}
+  modelDropdown: {fileID: 0}
+  autoApplyToggle: {fileID: 0}
+  callStartToggle: {fileID: 0}
+  selectTargetButton: {fileID: 0}
+  generateButton: {fileID: 0}
+  statusText: {fileID: 0}
+  currentTarget: {fileID: 0}
 --- !u!1 &444479774
 GameObject:
   m_ObjectHideFlags: 0
@@ -531,6 +554,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 738435282}
+  - component: {fileID: 738435283}
   m_Layer: 0
   m_Name: LLM
   m_TagString: Untagged
@@ -553,6 +577,30 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &738435283
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 738435281}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb1f84ac863376e4fb7e78d2b3b01443, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  target: {fileID: 0}
+  luaBehaviour: {fileID: 0}
+  model: gpt-4o-mini
+  apiKeyOverride: 
+  basePromptResourcePath: LLM/base_prompt
+  userPromptTemplateResourcePath: LLM/user_prompt_template
+  apiKeyResourcePath: Secrets/openai_api_key
+  naturalLanguageIntent: Make the object move in a circle and scale up and down smoothly.
+  objectDisplayName: Target
+  autoApplyToLuaBehaviour: 1
+  callStartAfterApply: 1
+  lastLua: 
 --- !u!1 &853330476
 GameObject:
   m_ObjectHideFlags: 0
@@ -563,6 +611,7 @@ GameObject:
   m_Component:
   - component: {fileID: 853330478}
   - component: {fileID: 853330477}
+  - component: {fileID: 853330479}
   m_Layer: 0
   m_Name: Manager
   m_TagString: Untagged
@@ -598,6 +647,23 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &853330479
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 853330476}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: af245f6c84cd1474c9e17bc6f0aff027, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxDistance: 100
+  pickMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  cancelKey: 27
 --- !u!1 &1252134641
 GameObject:
   m_ObjectHideFlags: 0

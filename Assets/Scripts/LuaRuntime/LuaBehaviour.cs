@@ -17,47 +17,7 @@ public class LuaBehaviour : MonoBehaviour
 
     void Awake()
     {
-        _script = new Script(CoreModules.Preset_Default);
-
-        // Register proxies
-        UserData.RegisterType<GameObjectProxy>();
-        UserData.RegisterType<TransformProxy>();
-        UserData.RegisterType<RigidbodyProxy>();
-        UserData.RegisterType<ParticleSystemProxy>();
-        UserData.RegisterType<AudioSourceProxy>();
-        UserData.RegisterType<AnimatorProxy>();
-        UserData.RegisterType<TextProxy>();
-        UserData.RegisterType<ButtonProxy>();
-        UserData.RegisterType<CollisionProxy>();
-
-        // DOTween bridge
-        UserData.RegisterType<LuaDOTween>();
-        _script.Globals["dotween"] = new LuaDOTween();
-
-        // Helpers
-        _script.Globals["log"] = (Action<string>)((s) => Debug.Log($"[Lua] {s}"));
-        _script.Globals["warn"] = (Action<string>)((s) => Debug.LogWarning($"[Lua] {s}"));
-        _script.Globals["error"] = (Action<string>)((s) => Debug.LogError($"[Lua] {s}"));
-        _script.Globals["time_seconds"] = (Func<double>)(() => (double)Time.timeAsDouble);
-        _script.Globals["find_go"] = (Func<string, GameObjectProxy>)(name =>
-        {
-            var go = GameObject.Find(name);
-            return go ? new GameObjectProxy(go) : null;
-        });
-
-        // self table
-        _self = DynValue.NewTable(_script).Table;
-        var goProxy = new GameObjectProxy(gameObject);
-        _self["gameObject"] = UserData.Create(goProxy);
-        _self["transform"]  = UserData.Create(goProxy.GetTransformProxy());
-
-        var rbProxy = goProxy.GetRigidbodyProxy();   if (rbProxy != null)   _self["rigidbody"] = UserData.Create(rbProxy);
-        var psProxy = goProxy.GetParticleSystemProxy(); if (psProxy != null) _self["particle"]  = UserData.Create(psProxy);
-        var audioProxy = goProxy.GetAudioSourceProxy(); if (audioProxy != null) _self["audio"] = UserData.Create(audioProxy);
-        var animatorProxy = goProxy.GetAnimatorProxy(); if (animatorProxy != null) _self["animator"] = UserData.Create(animatorProxy);
-
-        _script.Globals["self"] = _self;
-
+        // Build VM and compile initial source
         string src = scriptAsset != null ? scriptAsset.text : (inlineScript ?? string.Empty);
         CompileBind(src);
     }
@@ -98,19 +58,32 @@ public class LuaBehaviour : MonoBehaviour
         catch (ScriptRuntimeException ex) { Debug.LogError($"[Lua] on_trigger() error on '{name}': {ex.DecoratedMessage}"); }
     }
 
+    // Public helpers (nice for your generator)
+    public void CallStart()    => SafeCall(_fnStart);
+    public void CallTrigger()
+    {
+        if (_fnOnTrigger != null && _fnOnTrigger.Type == DataType.Function)
+        {
+            try { _script.Call(_fnOnTrigger, _self, DynValue.Nil); }
+            catch (ScriptRuntimeException ex) { Debug.LogError($"[Lua] on_trigger() error on '{name}': {ex.DecoratedMessage}"); }
+        }
+    }
+
     public void LoadScript(string code, bool callStart = true)
     {
         CompileBind(code ?? string.Empty);
         if (callStart) SafeCall(_fnStart);
     }
 
+    // ===== Core rebuild path =====
     void CompileBind(string src)
     {
         try
         {
+            // Fresh VM
             _script = new Script(CoreModules.Preset_Default);
 
-            // Re-register proxies
+            // Register proxies ONCE per VM build (safe to call multiple times)
             UserData.RegisterType<GameObjectProxy>();
             UserData.RegisterType<TransformProxy>();
             UserData.RegisterType<RigidbodyProxy>();
@@ -120,12 +93,10 @@ public class LuaBehaviour : MonoBehaviour
             UserData.RegisterType<TextProxy>();
             UserData.RegisterType<ButtonProxy>();
             UserData.RegisterType<CollisionProxy>();
-
-            // DOTween bridge (again, after VM rebuild)
             UserData.RegisterType<LuaDOTween>();
-            _script.Globals["dotween"] = new LuaDOTween();
 
-            // Helpers
+            // Helpers and DOTween bridge
+            _script.Globals["dotween"] = new LuaDOTween();
             _script.Globals["log"] = (Action<string>)((s) => Debug.Log($"[Lua] {s}"));
             _script.Globals["warn"] = (Action<string>)((s) => Debug.LogWarning($"[Lua] {s}"));
             _script.Globals["error"] = (Action<string>)((s) => Debug.LogError($"[Lua] {s}"));
@@ -136,14 +107,28 @@ public class LuaBehaviour : MonoBehaviour
                 return go ? new GameObjectProxy(go) : null;
             });
 
+            // Rebuild self **on this new VM**
+            _self = DynValue.NewTable(_script).Table;
+            var goProxy = new GameObjectProxy(gameObject);
+            _self["gameObject"] = UserData.Create(goProxy);
+            _self["transform"]  = UserData.Create(goProxy.GetTransformProxy());
+
+            var rbProxy = goProxy.GetRigidbodyProxy();           if (rbProxy != null)     _self["rigidbody"] = UserData.Create(rbProxy);
+            var psProxy = goProxy.GetParticleSystemProxy();      if (psProxy != null)     _self["particle"]  = UserData.Create(psProxy);
+            var audioProxy = goProxy.GetAudioSourceProxy();      if (audioProxy != null)  _self["audio"]     = UserData.Create(audioProxy);
+            var animatorProxy = goProxy.GetAnimatorProxy();      if (animatorProxy != null) _self["animator"] = UserData.Create(animatorProxy);
+
             _script.Globals["self"] = _self;
 
-            _script.DoString(src);
+            // Compile + bind
+            _script.DoString(src ?? string.Empty);
 
             _fnStart       = _script.Globals.Get("start");
             _fnUpdate      = _script.Globals.Get("update");
             _fnOnCollision = _script.Globals.Get("on_collision");
             _fnOnTrigger   = _script.Globals.Get("on_trigger");
+
+            Debug.Log($"[Lua] Bound on '{name}': start={_fnStart?.Type}, update={_fnUpdate?.Type}, on_collision={_fnOnCollision?.Type}, on_trigger={_fnOnTrigger?.Type}");
         }
         catch (SyntaxErrorException ex)
         {
