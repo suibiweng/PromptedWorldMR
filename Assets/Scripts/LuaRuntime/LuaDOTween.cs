@@ -190,4 +190,63 @@ public class LuaDOTween
         }
         return false;
     }
+
+    // =====================
+    // Convenience overloads
+    // =====================
+
+    // Allow Lua: dotween:MoveTo(self.transform, x, y, duration, 'Ease')
+    // Defaults missing Z to current world Z.
+    public int MoveTo(TransformProxy tProxy, double x, double y, double duration, string ease = "")
+    {
+        var t = From(tProxy);
+        if (!t) return -1;
+        var currZ = t.position.z;
+        return MoveTo(tProxy, x, y, currZ, duration, ease);
+    }
+
+    // Allow Lua: dotween:RotateTo(self.transform, x, y, duration, 'Ease')
+    // Defaults missing Z to current Euler Z.
+    public int RotateTo(TransformProxy tProxy, double x, double y, double duration, string ease = "")
+    {
+        var t = From(tProxy);
+        if (!t) return -1;
+        var currZ = t.eulerAngles.z;
+        return RotateTo(tProxy, x, y, currZ, duration, ease);
+    }
+
+    // Allow Lua: dotween:ScaleTo(self.transform, x, y, duration, 'Ease')
+    // Defaults missing Z to current localScale Z.
+    public int ScaleTo(TransformProxy tProxy, double x, double y, double duration, string ease = "")
+    {
+        var t = From(tProxy);
+        if (!t) return -1;
+        var currZ = t.localScale.z;
+        return ScaleTo(tProxy, x, y, currZ, duration, ease);
+    }
+
+    // Intent-clear helpers (nice for humans & models)
+    public int RotateYTo(TransformProxy tProxy, double y, double duration, string ease = "")
+    {
+        var t = From(tProxy);
+        if (!t) return -1;
+        var e = t.eulerAngles;
+        return RotateTo(tProxy, e.x, y, e.z, duration, ease);
+    }
+
+    public int RotateXTo(TransformProxy tProxy, double x, double duration, string ease = "")
+    {
+        var t = From(tProxy);
+        if (!t) return -1;
+        var e = t.eulerAngles;
+        return RotateTo(tProxy, x, e.y, e.z, duration, ease);
+    }
+
+    public int RotateZTo(TransformProxy tProxy, double z, double duration, string ease = "")
+    {
+        var t = From(tProxy);
+        if (!t) return -1;
+        var e = t.eulerAngles;
+        return RotateTo(tProxy, e.x, e.y, z, duration, ease);
+    }
 }

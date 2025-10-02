@@ -4,10 +4,29 @@ GameObject display name: {OBJECT_NAME}
 User intent:
 {INTENT}
 
-Constraints:
-- Output ONLY Lua. No markdown, no explanations.
-- Functions required: start(), update(deltaTime), on_trigger(), on_collision(col).
-- Use dotween:MoveTo/RotateTo/ScaleTo with self.transform. Example:
---   local h = dotween:MoveTo(self.transform, 0,1,0, 1.2, 'OutQuad')
-- Use update(deltaTime) for continuous motion; use on_trigger() for one-shot play.
-- Avoid Time.deltaTime; use the provided deltaTime parameter.
+Contract (required function signatures):
+function start(self)
+function update(self, deltaTime)
+function on_trigger(self, other)
+function on_collision(self, col)
+
+Transform access (preferred):
+- Read/write via proxy properties:
+  local p = self.transform.position
+  p.x = p.x + 1
+  self.transform.position = { x = p.x, y = p.y, z = p.z }
+- Also valid: self.transform.localPosition, self.transform.localScale, self.transform.eulerAngles
+  (Each supports .x/.y/.z and whole-table assignment.)
+
+DOTween usage:
+- Create tweens in start(self) or on_trigger(self, other), not every frame in update.
+- Examples:
+  -- dotween:MoveTo(self.transform, 0, 1, 0, 1.2, 'OutQuad')
+  -- dotween:ScaleTo(self.transform, 1.5, 1.5, 1.5, 0.5, 'InOutSine')
+
+Rules:
+- Output ONLY valid Lua (no markdown, no explanations).
+- Use update(self, deltaTime) for continuous logic; on_trigger/on_collision for events.
+- Don’t reference Time.deltaTime directly; use deltaTime parameter.
+- Durations in seconds; vectors are tables {x=..., y=..., z=...}.
+- Keep function names exactly as specified (lowercase).
