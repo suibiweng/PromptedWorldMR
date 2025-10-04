@@ -1,7 +1,10 @@
 using UnityEngine;
-using PromtedWorld;
+using PromptedWorld;
 public class PromptedWorldManager : MonoBehaviour
 {
+
+
+    public GameObject ProgramableObjectPrefab;
 
 
     public GameObject selectedObject;
@@ -20,9 +23,16 @@ public class PromptedWorldManager : MonoBehaviour
     public void CreateShape(int shapeType)
     {
 
+        GameObject obj = Instantiate(ProgramableObjectPrefab);
+        obj.transform.SetParent(this.transform);
+        obj.transform.localPosition = Vector3.zero;
+        obj.transform.localRotation = Quaternion.identity;
+        obj.transform.localScale = Vector3.one * 0.2f;
         // Example shape creation
         GameObject shape = PrimitiveFactory.CreatePrimitive(shapeType, Vector3.zero, Quaternion.identity);
-        selectedObject = shape;
+
+        obj.GetComponent<ProgramableObject>().setShape(shape);
+        // selectedObject = shape;
     }
     
 

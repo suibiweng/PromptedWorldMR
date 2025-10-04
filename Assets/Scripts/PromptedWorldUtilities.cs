@@ -9,7 +9,7 @@ using UnityEngine.Rendering; // MeshData APIs
 
 
 
-namespace PromtedWorld
+namespace PromptedWorld
 {
     public enum GenerateType
     {

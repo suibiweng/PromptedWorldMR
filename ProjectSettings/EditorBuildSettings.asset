@@ -6,8 +6,8 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/PassthroughCameraApiSamples/MultiObjectDetection/MultiObjectDetection.unity
-    guid: 20c230cce46443841b5727b1d6100bfc
+    path: Assets/Scenes/WorkSpace.unity
+    guid: 4dcfd7317b371c24dbcce2b5b3931ffc
   m_configObjects:
     Unity.XR.Oculus.Settings: {fileID: 11400000, guid: 136951f51e53ba84ba411da0d4ed8359, type: 2}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 59d30aca7726c4746a47e67d4c1a67e9, type: 2}
