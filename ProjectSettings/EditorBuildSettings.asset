@@ -6,6 +6,18 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/MRUKSamples/Experimental/EnvironmentPanelPlacement/EnvironmentPanelPlacement.unity
+    guid: 01a2198db44a25d44a3108875f7fd3d5
+  - enabled: 1
+    path: Assets/MRUKSamples/DestructibleMesh/DestructibleMesh.unity
+    guid: 592114de817c8e1478a2e5b8b6843b2f
+  - enabled: 1
+    path: Assets/DepthAPISample/Scenes/SceneAPIPlacement.unity
+    guid: 322558410ea6d2443970fb019a541f7e
+  - enabled: 1
+    path: Assets/Scenes/RoomMeshes.unity
+    guid: eab4052f68f794d9ab7a37cd2fa08512
+  - enabled: 1
     path: Assets/Scenes/WorkSpace.unity
     guid: 4dcfd7317b371c24dbcce2b5b3931ffc
   m_configObjects:
