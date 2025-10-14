@@ -933,6 +933,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e8242d60a48f79946a824a367054da81, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  ProgramableObjectPrefab: {fileID: 7692451994609705636, guid: c4780d47f34afb84aadb9ed28291e8be, type: 3}
   selectedObject: {fileID: 0}
 --- !u!4 &853330478
 Transform:

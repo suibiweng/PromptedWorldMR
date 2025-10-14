@@ -5,12 +5,15 @@ using TMPro;
 
 
 public class ProgramableObject : MonoBehaviour
-{   
-    public TextMeshPro Objlabel;
+{
+
+    public bool isRealObject = false;
+    public TMP_Text TextBox;
     public RawImage Objimage;
     public Renderer ShapeRenderer;
     public GameObject shape;
     public Transform shapeRoot;
+    
     public LuaBehaviour luaBehaviour;
 
     public Outline selectOutline;
@@ -30,12 +33,14 @@ public class ProgramableObject : MonoBehaviour
 
     public void setLabel(string label)
     {
-        Objlabel.text = label;
+        TextBox.text = label;
     }   
 
     public void setImage(Texture texture)
-    {
+    {   Objimage.gameObject.SetActive(true);
+    
         Objimage.texture = texture;
+        Objimage.color = Color.white;
     }
 
     public void setShape(GameObject obj)

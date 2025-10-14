@@ -15,7 +15,7 @@ MonoBehaviour:
   m_StereoRenderingModeDesktop: 1
   m_StereoRenderingModeAndroid: 2
   SharedDepthBuffer: 1
-  DepthSubmission: 0
+  DepthSubmission: 1
   DashSupport: 1
   LowOverheadMode: 0
   OptimizeBufferDiscards: 1
@@ -28,8 +28,8 @@ MonoBehaviour:
   EnableTrackingOriginStageMode: 0
   SpaceWarp: 0
   TargetQuest2: 1
-  TargetQuestPro: 0
-  TargetQuest3: 0
+  TargetQuestPro: 1
+  TargetQuest3: 1
   TargetQuest3S: 0
   SystemSplashScreen: {fileID: 0}
   UseStickControlThumbsticks: 0
