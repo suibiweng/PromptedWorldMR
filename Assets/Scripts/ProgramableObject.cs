@@ -6,6 +6,12 @@ using TMPro;
 
 public class ProgramableObject : MonoBehaviour
 {
+    public PromptedWorldManager promptedWorldManager;
+    public string id;
+
+    
+
+    public string promptlog;
 
     public bool isRealObject = false;
     public TMP_Text TextBox;
@@ -17,6 +23,15 @@ public class ProgramableObject : MonoBehaviour
     public LuaBehaviour luaBehaviour;
 
     public Outline selectOutline;
+
+
+            void Awake()
+    {
+            promptedWorldManager=FindAnyObjectByType<PromptedWorldManager>();
+            // Assign a new ID only if not already set
+            if (string.IsNullOrEmpty(id))
+                id = IDGenerator.GenerateID();
+        }
 
 
 
@@ -45,13 +60,24 @@ public class ProgramableObject : MonoBehaviour
 
     public void setShape(GameObject obj)
     {
-        
+
         shape = obj;
         selectOutline = shape.AddComponent<Outline>();
         shape.transform.SetParent(shapeRoot);
         shape.transform.localPosition = Vector3.zero;
         shape.transform.localRotation = Quaternion.identity;
         ShapeRenderer = shape.GetComponent<Renderer>();
+    }
+
+    public bool isToching;
+    float Touchingdistance = 0.1f;
+
+    void TochingDetection()
+    {
+       isToching=
+        Vector3.Distance(promptedWorldManager.userLeftHand.position, this.gameObject.transform.position) < Touchingdistance ||
+        Vector3.Distance(promptedWorldManager.userRightHand.position, this.gameObject.transform.position) < Touchingdistance;
+    
     }
 
 
@@ -65,6 +91,8 @@ public class ProgramableObject : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+
+        TochingDetection();
 
     }
 }

@@ -178,9 +178,9 @@ namespace PassthroughCameraSamples.MultiObjectDetection
                 eMarker.GetComponent<DetectionSpawnMarkerAnim>().SetYoloClassName(className);
 
 // NEW: make this marker follow future detections of the same class
-            var follower = eMarker.GetComponent<FollowYoloBox>();
-            if (follower == null) follower = eMarker.AddComponent<FollowYoloBox>();
-            follower.Init(m_uiInference, className, m_spawnDistance);
+            // // var follower = eMarker.GetComponent<FollowYoloBox>();
+            // // if (follower == null) follower = eMarker.AddComponent<FollowYoloBox>();
+            // follower.Init(m_uiInference, className, m_spawnDistance);
 
 
 
