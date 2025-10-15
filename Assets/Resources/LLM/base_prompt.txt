@@ -79,3 +79,10 @@ EXAMPLES (idioms the environment supports)
 --   local h = dotween:ScaleTo(self.transform, 1.2, 1.2, 1.2, 0.2, 'OutCubic')
 --   dotween:SetLoops(h, 2, 'yoyo')
 --   dotween:Play(h)
+
+EDIT-IN-PLACE RULES
+- If CURRENT_LUA is provided, MODIFY it MINIMALLY to satisfy the new intent.
+- Keep the same function signatures and any existing state/config tables (e.g., self.cfg, self.state).
+- Prefer changing numeric values in self.cfg or adding a new tween/sequence, rather than rewriting structure.
+- Preserve existing behavior unless explicitly asked to change/remove it.
+- Always return COMPLETE Lua after edits (overwrite the whole script).

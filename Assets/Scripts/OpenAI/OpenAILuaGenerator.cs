@@ -1,12 +1,10 @@
-// Assets/Scripts/OpenAILuaGenerator.cs
+// Assets/Scripts/LuaRuntime/OpenAILuaGenerator.cs
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
-
 using UnityEngine;
 using UnityEngine.Networking;
-using PromptedWorld;
 
 [DisallowMultipleComponent]
 public class OpenAILuaGenerator : MonoBehaviour
@@ -15,192 +13,219 @@ public class OpenAILuaGenerator : MonoBehaviour
     [SerializeField] private GameObject target;             // assign in Inspector or via AssignTarget(...)
     [SerializeField] private LuaBehaviour luaBehaviour;     // auto-filled from target
 
+    [Header("Prompt Inputs")]
+    [TextArea(2, 6)] public string naturalLanguageIntent;   // user text
+    public TextAsset basePromptText;                        // Resources: base_prompt.txt (or any TextAsset)
+    public TextAsset userTemplateText;                      // Resources: user_prompt_template.txt
+
+    // === Back-compat fields expected by LuaPromptUI ===
+    [Header("Back-Compat (LuaPromptUI expects these)")]
+    public string objectDisplayName;                        // if empty, falls back to target.name
+    public bool autoApplyToLuaBehaviour = true;             // if false, we won't LoadScript; just store lastGeneratedLua
+    public bool callStartAfterApply = true;                 // kept for compatibility; note: LuaBehaviour.LoadScript already calls start()
+
     [Header("OpenAI")]
-    [SerializeField] private string model = "gpt-4o-mini";
-    [Tooltip("If set, overrides env var and Resources key file.")]
-    [SerializeField] private string apiKeyOverride = "";
+    [SerializeField] private string apiKey;                 // set via inspector or env var
+    [SerializeField] private string model = "gpt-4.1-mini";
+    [Range(0f, 2f)] public float temperature = 0.2f;
 
-    [Header("Resources Paths (no extension)")]
-    [Tooltip("System/base rules. e.g., 'LLM/base_prompt' -> Assets/Resources/LLM/base_prompt.txt")]
-    [SerializeField] private string basePromptResourcePath = "LLM/base_prompt";
+    public enum GenerationMode { Replace, EditInPlace }
 
-    [Tooltip("Per-request template. e.g., 'LLM/user_prompt_template'")]
-    [SerializeField] private string userPromptTemplateResourcePath = "LLM/user_prompt_template";
+    [Header("Generation Mode")]
+    [SerializeField] private GenerationMode mode = GenerationMode.EditInPlace;
 
-    [Tooltip("Secrets key file. e.g., 'Secrets/openai_api_key'")]
-    [SerializeField] private string apiKeyResourcePath = "Secrets/openai_api_key";
+    // Runtime helpers
+    private string _activeLogId = null;
+    private float  _rtStartTime = 0f;
 
-    [Header("User Prompt Values")]
-    [TextArea(3, 8)] public string naturalLanguageIntent = "Make the object move in a circle and scale up and down smoothly.";
-    public string objectDisplayName = ""; // defaults to target's name if empty
+    // For cases where autoApplyToLuaBehaviour == false
+    [NonSerialized] public string lastGeneratedLua = "";
 
-    [Header("Apply Options")]
-    public bool autoApplyToLuaBehaviour = true;
-    public bool callStartAfterApply = true;
-
-    [TextArea(6, 30)] public string lastLua;
-
-    private const string ChatUrl = "https://api.openai.com/v1/chat/completions";
-
-    // ---------- Public API ----------
+    // ====== Public API ======
     public void AssignTarget(GameObject go)
     {
         target = go;
-        luaBehaviour = EnsureLuaBehaviourOnTarget(target);
-        if (string.IsNullOrWhiteSpace(objectDisplayName) && target) objectDisplayName = target.name;
+        luaBehaviour = (go != null) ? go.GetComponent<LuaBehaviour>() : null;
     }
 
-    [ContextMenu("Generate Lua Now")]
+    public void SetIntent(string intent)
+    {
+        naturalLanguageIntent = intent;
+    }
+
+    // Back-compat: LuaPromptUI calls this
     public void GenerateLuaNow()
     {
-        StopAllCoroutines();
+        StartGeneration();
+    }
+
+    public void StartGeneration()
+    {
+        if (string.IsNullOrWhiteSpace(naturalLanguageIntent))
+        {
+            Debug.LogWarning("[LuaGen] Empty intent.");
+            return;
+        }
         StartCoroutine(Co_GenerateLua());
     }
 
-    // ---------- Internals ----------
-    private LuaBehaviour EnsureLuaBehaviourOnTarget(GameObject go)
+    // ====== Request / Response DTOs (simple) ======
+    [Serializable] private class Message { public string role; public string content; }
+    [Serializable] private class ChatRequest
     {
-        if (!go) return null;
-        var lb = go.GetComponent<LuaBehaviour>();
-        if (!lb) lb = go.AddComponent<LuaBehaviour>();
-        return lb;
+        public string model;
+        public float temperature;
+        public List<Message> messages;
     }
+    [Serializable] private class Choice   { public Message message; }
+    [Serializable] private class ChatResponse { public List<Choice> choices; }
 
+    // ====== Coroutine ======
     private IEnumerator Co_GenerateLua()
     {
-        // Target & host LuaBehaviour
-        if (target) luaBehaviour = EnsureLuaBehaviourOnTarget(target);
-        if (!luaBehaviour) luaBehaviour = GetComponent<LuaBehaviour>();
-        if (!luaBehaviour) luaBehaviour = EnsureLuaBehaviourOnTarget(gameObject);
-        if (!luaBehaviour)
-        {
-            Debug.LogError("Failed to locate or add LuaBehaviour.");
-            yield break;
-        }
-        if (string.IsNullOrWhiteSpace(objectDisplayName)) objectDisplayName = luaBehaviour.gameObject.name;
+        // Resolve target
+        if (luaBehaviour == null && target != null)
+            luaBehaviour = target.GetComponent<LuaBehaviour>();
 
-        // Key resolution: override -> env -> Resources
-        string key = ResolveApiKey();
-        if (string.IsNullOrEmpty(key))
+        if (target == null)
         {
-            Debug.LogError("OpenAI API key not found. Set apiKeyOverride, OPENAI_API_KEY env var, or Resources/Secrets/openai_api_key.txt");
+            Debug.LogError("[LuaGen] No target GameObject assigned.");
             yield break;
         }
 
-        // Load prompts from Resources
-        string basePrompt = ResourcesText.Load(basePromptResourcePath);
-        if (string.IsNullOrWhiteSpace(basePrompt))
+        // Build system/user prompts
+        string basePrompt = basePromptText != null ? basePromptText.text : "";
+        string template   = userTemplateText != null ? userTemplateText.text : "";
+        if (string.IsNullOrEmpty(basePrompt) || string.IsNullOrEmpty(template))
         {
-            Debug.LogError($"Missing or empty base prompt at Resources/{basePromptResourcePath}.txt");
+            Debug.LogError("[LuaGen] Missing basePromptText or userTemplateText.");
             yield break;
         }
 
-        string userTemplate = ResourcesText.Load(userPromptTemplateResourcePath);
-        if (string.IsNullOrWhiteSpace(userTemplate))
-        {
-            Debug.LogError($"Missing or empty user prompt template at Resources/{userPromptTemplateResourcePath}.txt");
-            yield break;
-        }
+        // Name used in the prompt
+        string objName = !string.IsNullOrWhiteSpace(objectDisplayName)
+            ? objectDisplayName
+            : (target != null ? target.name : "Target");
 
-        string userPrompt = BuildUserPrompt(userTemplate, naturalLanguageIntent, objectDisplayName);
+        // Provide CURRENT_LUA when editing
+        string currentLua = "";
+        if (mode == GenerationMode.EditInPlace && luaBehaviour != null)
+            currentLua = luaBehaviour.CurrentLua ?? "";
+
+        string userPrompt = BuildUserPrompt(template, naturalLanguageIntent, objName, currentLua);
+
+        // Begin per-object log if available
+        _activeLogId = null;
+        _rtStartTime = Time.realtimeSinceStartup;
+        ProgramableObject po = target.GetComponent<ProgramableObject>();
+        if (po != null)
+            _activeLogId = po.BeginPromptLog(naturalLanguageIntent, mode.ToString(), model);
 
         // Build request
-        var reqBody = new ChatRequest
+        var reqObj = new ChatRequest
         {
             model = model,
+            temperature = temperature,
             messages = new List<Message>
             {
                 new Message { role = "system", content = basePrompt },
                 new Message { role = "user",   content = userPrompt }
-            },
-            temperature = 0.2f
+            }
         };
-        string json = JsonUtility.ToJson(reqBody);
 
-        using (var req = new UnityWebRequest(ChatUrl, "POST"))
+        string json = JsonUtility.ToJson(reqObj);
+
+        using (var www = new UnityWebRequest("https://api.openai.com/v1/chat/completions", "POST"))
         {
-            byte[] body = Encoding.UTF8.GetBytes(json);
-            req.uploadHandler = new UploadHandlerRaw(body);
-            req.downloadHandler = new DownloadHandlerBuffer();
-            req.SetRequestHeader("Authorization", "Bearer " + key);
-            req.SetRequestHeader("Content-Type", "application/json");
+            byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
+            www.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            www.downloadHandler = new DownloadHandlerBuffer();
+            www.SetRequestHeader("Content-Type", "application/json");
+            www.SetRequestHeader("Authorization", "Bearer " + apiKey);
 
-            yield return req.SendWebRequest();
+            yield return www.SendWebRequest();
 
-            if (req.result != UnityWebRequest.Result.Success)
+            if (www.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogError($"OpenAI error: {req.responseCode} {req.error}\n{req.downloadHandler.text}");
+                __RecordFailure(po, $"HTTP error: {www.error}");
                 yield break;
             }
 
-            var resp = JsonUtility.FromJson<ChatResponse>(req.downloadHandler.text);
-            string lua = ExtractFirstMessageText(resp);
-            lastLua = lua;
-
-            if (string.IsNullOrWhiteSpace(lua))
+            ChatResponse resp = null;
+            try
             {
-                Debug.LogError("Model returned empty Lua.");
+                resp = JsonUtility.FromJson<ChatResponse>(www.downloadHandler.text);
+            }
+            catch (Exception ex)
+            {
+                __RecordFailure(po, $"Parse error: {ex.Message}");
                 yield break;
             }
 
-            if (autoApplyToLuaBehaviour && luaBehaviour)
+            string luaText = ExtractFirstMessageText(resp);
+            if (string.IsNullOrWhiteSpace(luaText))
             {
-                luaBehaviour.LoadScript(lua, callStartAfterApply);
-                Debug.Log($"Applied Lua ({lua.Length} chars) to {luaBehaviour.gameObject.name}");
+                __RecordFailure(po, "Empty Lua in response");
+                yield break;
             }
-            else
+
+            // Decide whether to apply or just store
+            lastGeneratedLua = luaText;
+
+            if (!autoApplyToLuaBehaviour)
             {
-                Debug.Log($"Lua generated ({lua.Length} chars), not auto-applied.");
+                // Not applying; just finalize log success with the generated script
+                if (po != null && !string.IsNullOrEmpty(_activeLogId))
+                {
+                    float dt = Time.realtimeSinceStartup - _rtStartTime;
+                    po.CompletePromptLogSuccess(_activeLogId, luaText, dt, 0, 0);
+                    _activeLogId = null;
+                }
+                yield break;
+            }
+
+            // Apply to LuaBehaviour (required for live updates)
+            if (luaBehaviour == null)
+            {
+                luaBehaviour = target.GetComponent<LuaBehaviour>();
+                if (luaBehaviour == null)
+                {
+                    __RecordFailure(po, "No LuaBehaviour on target to apply the script.");
+                    yield break;
+                }
+            }
+
+            try
+            {
+                // Note: LuaBehaviour.LoadScript() already calls start()
+                // The 'callStartAfterApply' flag is kept for back-compat with your UI,
+                // but we can't suppress LoadScript's internal start() without changing LuaBehaviour.
+                luaBehaviour.LoadScript(luaText);
+
+                if (po != null && !string.IsNullOrEmpty(_activeLogId))
+                {
+                    float dt = Time.realtimeSinceStartup - _rtStartTime;
+                    po.CompletePromptLogSuccess(_activeLogId, luaText, dt, 0, 0);
+                    _activeLogId = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                __RecordFailure(po, $"Apply error: {ex.Message}");
+                yield break;
             }
         }
     }
 
-    private string ResolveApiKey()
-    {
-        if (!string.IsNullOrEmpty(apiKeyOverride)) return apiKeyOverride;
-
-        string env = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-        if (!string.IsNullOrEmpty(env)) return env;
-
-        string fromRes = ResourcesText.Load(apiKeyResourcePath);
-        if (!string.IsNullOrWhiteSpace(fromRes)) return fromRes.Trim();
-
-        return null;
-    }
-
-    private static string BuildUserPrompt(string template, string intent, string objectName)
+    // ====== Helpers ======
+    private static string BuildUserPrompt(string template, string intent, string objectName, string currentLua)
     {
         string name = string.IsNullOrWhiteSpace(objectName) ? "Target" : objectName.Trim();
         string want = (intent ?? "").Trim();
+        string cur  = (currentLua ?? "").Trim();
         return template.Replace("{OBJECT_NAME}", name)
-                       .Replace("{INTENT}", want);
-    }
-
-    // -------- Chat API DTOs --------
-    [Serializable] private class ChatRequest
-    {
-        public string model;
-        public List<Message> messages;
-        public float temperature = 0.7f;
-    }
-
-    [Serializable] private class Message
-    {
-        public string role;
-        public string content;
-    }
-
-    [Serializable] private class ChatResponse
-    {
-        public List<Choice> choices;
-    }
-
-    [Serializable] private class Choice
-    {
-        public Message message;
-        public int index;
-        public object logprobs;
-        public string finish_reason;
+                       .Replace("{INTENT}", want)
+                       .Replace("{CURRENT_LUA}", cur);
     }
 
     private static string ExtractFirstMessageText(ChatResponse resp)
@@ -208,5 +233,16 @@ public class OpenAILuaGenerator : MonoBehaviour
         if (resp == null || resp.choices == null || resp.choices.Count == 0) return null;
         var m = resp.choices[0].message;
         return m != null ? m.content : null;
+    }
+
+    private void __RecordFailure(ProgramableObject po, string msg)
+    {
+        Debug.LogError("[LuaGen] " + msg);
+        if (po != null && !string.IsNullOrEmpty(_activeLogId))
+        {
+            float dt = Time.realtimeSinceStartup - _rtStartTime;
+            po.CompletePromptLogFailure(_activeLogId, msg, dt);
+            _activeLogId = null;
+        }
     }
 }

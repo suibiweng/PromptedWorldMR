@@ -1,9 +1,29 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using UnityEngine.Events;
 using Oculus.Interaction;   // IInteractableView / InteractableState
 using PromptedWorld;        // PromptedWorldManager
+
+// --------- Prompt Log DTO ---------
+[Serializable]
+public class PromptLogEntry
+{
+    public string id;
+    public string timestampIso;
+    public string objectName;
+    [TextArea(2, 6)] public string prompt;
+    public string mode;     // "Replace" | "EditInPlace" | etc.
+    public string model;    // e.g., "gpt-4.1-mini", "o4-mini", etc.
+    public bool succeeded;
+    public float durationSec;
+    public int inputTokens;
+    public int outputTokens;
+    public string luaHash;
+    [TextArea(2, 6)] public string notes;
+}
 
 public class ProgramableObject : MonoBehaviour
 {
@@ -57,6 +77,13 @@ public class ProgramableObject : MonoBehaviour
     public bool _prevTouching;
     public bool highlightLatched;                    // sticky highlight state
     private InteractableState _lastState = InteractableState.Normal;
+
+    // ========= PROMPT LOG (add-only) =========
+    [Header("Prompt Log")]
+    [SerializeField] private List<PromptLogEntry> _promptLog = new List<PromptLogEntry>();
+    [Serializable] public class PromptLogUpdatedEvent : UnityEvent<PromptLogEntry> { }
+    public PromptLogUpdatedEvent OnPromptLogUpdated;
+    public IReadOnlyList<PromptLogEntry> PromptLog => _promptLog;
 
     void Awake()
     {
@@ -154,45 +181,35 @@ public class ProgramableObject : MonoBehaviour
         if (prevState != InteractableState.Hover && newState == InteractableState.Hover)
         {
             _hovering = true;
-            // ---- Hover Enter hook ----
-            // TODO: put your hover-enter code here
-            // e.g., Debug.Log("Hover ENTER");
             onHoverEnter?.Invoke();
-            OnHoverEnter(); // overridable block
+            OnHoverEnter();
         }
         else if (prevState == InteractableState.Hover && newState != InteractableState.Hover)
         {
             _hovering = false;
-            // ---- Hover Exit hook ----
-            // TODO: put your hover-exit code here
-            // e.g., Debug.Log("Hover EXIT");
             onHoverExit?.Invoke();
-            OnHoverExit(); // overridable block
+            OnHoverExit();
         }
 
         // Select transitions
         if (prevState != InteractableState.Select && newState == InteractableState.Select)
         {
             _selected = true;
+
             // Latch/toggle sticky highlight on SELECT ENTER (if enabled)
             if (stickyHighlightEnabled)
                 highlightLatched = !highlightLatched;
 
-            // ---- Select Enter hook ----
-            // TODO: put your select-enter code here
-            // e.g., play sound, spawn UI, run Lua
             onSelectEnter?.Invoke();
-            OnSelectEnter(); // overridable block
+            OnSelectEnter();
         }
         else if (prevState == InteractableState.Select && newState != InteractableState.Select)
         {
             _selected = false;
             // We do NOT auto-clear the latch here; it stays until next Select ENTER
 
-            // ---- Select Exit hook ----
-            // TODO: put your select-exit code here
             onSelectExit?.Invoke();
-            OnSelectExit(); // overridable block
+            OnSelectExit();
         }
 
         UpdateHighlightVisual();
@@ -259,26 +276,109 @@ public class ProgramableObject : MonoBehaviour
 
     protected virtual void OnHoverEnter()
     {
-        // TODO: drop custom code here if you inherit this class
-        // Example: Debug.Log("[ProgramableObject] Hover Enter");
+        // Custom code on hover enter
     }
 
     protected virtual void OnHoverExit()
     {
-        // TODO: drop custom code here
+        // Custom code on hover exit
     }
 
     protected virtual void OnSelectEnter()
     {
+        // Keep your existing selection behavior
+        if (promptedWorldManager != null)
+            promptedWorldManager.selectedObject = this.gameObject;
 
-        promptedWorldManager.selectedObject = this.gameObject;
-        // TODO: drop custom code here
-        // Example: run a Lua command:
-        // if (luaBehaviour) luaBehaviour.Trigger();
+        // Custom code on select enter (e.g., lua trigger)
+        // if (TryGetComponent<LuaBehaviour>(out var lua)) lua.Trigger();
     }
 
     protected virtual void OnSelectExit()
     {
-        // TODO: drop custom code here
+        // Custom code on select exit
+    }
+
+    // ========= PROMPT LOG PUBLIC API =========
+
+    /// <summary>
+    /// Call when a prompt starts; returns log entry id (GUID).
+    /// </summary>
+    public string BeginPromptLog(string prompt, string mode, string model)
+    {
+        var entry = new PromptLogEntry
+        {
+            id = Guid.NewGuid().ToString("N"),
+            timestampIso = DateTime.UtcNow.ToString("o"),
+            objectName = gameObject.name,
+            prompt = prompt ?? "",
+            mode = mode ?? "",
+            model = model ?? "",
+            succeeded = false,
+            durationSec = 0f,
+            inputTokens = 0,
+            outputTokens = 0,
+            luaHash = "",
+            notes = ""
+        };
+        _promptLog.Add(entry);
+        OnPromptLogUpdated?.Invoke(entry);
+        return entry.id;
+    }
+
+    /// <summary>
+    /// Call on success to finalize the entry.
+    /// </summary>
+    public void CompletePromptLogSuccess(string id, string luaAppliedText, float durationSec, int inputTokens = 0, int outputTokens = 0)
+    {
+        var e = FindEntry(id);
+        if (e == null) return;
+
+        e.succeeded = true;
+        e.durationSec = durationSec;
+        e.inputTokens = inputTokens;
+        e.outputTokens = outputTokens;
+        e.luaHash = ShortHash(luaAppliedText);
+        OnPromptLogUpdated?.Invoke(e);
+    }
+
+    /// <summary>
+    /// Call on failure to finalize the entry with an error note.
+    /// </summary>
+    public void CompletePromptLogFailure(string id, string errorMessage, float durationSec)
+    {
+        var e = FindEntry(id);
+        if (e == null) return;
+
+        e.succeeded = false;
+        e.durationSec = durationSec;
+        e.notes = errorMessage ?? "Unknown error";
+        OnPromptLogUpdated?.Invoke(e);
+    }
+
+    public void ClearPromptLog()
+    {
+        _promptLog.Clear();
+        OnPromptLogUpdated?.Invoke(null);
+    }
+
+    // ========= PROMPT LOG INTERNALS =========
+
+    private PromptLogEntry FindEntry(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return null;
+        return _promptLog.Find(x => x.id == id);
+    }
+
+    private static string ShortHash(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+        unchecked
+        {
+            int h = 23;
+            for (int i = 0; i < text.Length; i++)
+                h = h * 31 + text[i];
+            return h.ToString("X8");
+        }
     }
 }
