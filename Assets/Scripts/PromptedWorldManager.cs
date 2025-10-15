@@ -128,7 +128,7 @@ public class PromptedWorldManager : MonoBehaviour
             return;
         }
 
-        GameObject container = Instantiate(ProgramableObjectPrefab, transform, false);
+        GameObject container = Instantiate(ProgramableObjectPrefab, userLeftHand.position, Quaternion.identity);
         container.name = $"{ProgramableObjectPrefab.name}_Virtual";
         container.transform.localPosition = Vector3.zero;
         container.transform.localRotation = Quaternion.identity;
@@ -148,6 +148,8 @@ public class PromptedWorldManager : MonoBehaviour
             prog.isRealObject = false;
             if (_all.Contains(prog)) Reclassify(prog, false);
         }
+
+        prog.promptedWorldManager = this;
 
         GameObject shape = PrimitiveFactory.CreatePrimitive(shapeType, Vector3.zero, Quaternion.identity);
         if (shape == null)

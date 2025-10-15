@@ -2,7 +2,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-
+using PromptedWorld;
 public class LuaPromptUI : MonoBehaviour
 {
     [Header("Generator")]
@@ -27,8 +27,12 @@ public class LuaPromptUI : MonoBehaviour
     [Header("Selection")]
     [SerializeField] private GameObject currentTarget;        // inspector-visible
 
+
+    public PromptedWorldManager pwm;
+
     private void Awake()
     {
+        pwm = FindObjectOfType<PromptedWorldManager>();
         if (!generator) generator = FindObjectOfType<OpenAILuaGenerator>();
         if (selectTargetButton) selectTargetButton.onClick.AddListener(BeginSelectTarget);
         if (startButton)        startButton.onClick.AddListener(StartGeneration);
@@ -58,6 +62,9 @@ public class LuaPromptUI : MonoBehaviour
 
     private void StartGeneration()
     {
+
+        currentTarget= pwm.selectedObject;
+
         if (!generator)
         {
             UpdateStatus("Generator missing in scene.");
@@ -67,6 +74,13 @@ public class LuaPromptUI : MonoBehaviour
         {
             UpdateStatus("Pick a target first.");
             return;
+        }
+        else
+        {
+
+        UpdateStatus("Current target: " + currentTarget.name  );
+            
+
         }
 
         // Apply UI -> generator
