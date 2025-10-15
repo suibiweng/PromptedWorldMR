@@ -762,7 +762,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 15b1d5ff3d274694e8d0c6cb466a4ae6, type: 2}
+  - {fileID: 2100000, guid: e11c729d3748cd941af73e3f4e6cf9ee, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -900,6 +900,14 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   onProximityExit:
+    m_PersistentCalls:
+      m_Calls: []
+  _selected: 0
+  _hovering: 0
+  _prevTouching: 0
+  highlightLatched: 0
+  _promptLog: []
+  OnPromptLogUpdated:
     m_PersistentCalls:
       m_Calls: []
 --- !u!114 &918196740110979837
