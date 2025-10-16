@@ -1,7 +1,7 @@
 using System;
 using MoonSharp.Interpreter;
 using UnityEngine;
-using LuaProxies; // delete if your proxies have no namespace
+using LuaProxies; // keep if your proxies live in this namespace
 
 [DisallowMultipleComponent]
 public class LuaBehaviour : MonoBehaviour
@@ -11,32 +11,57 @@ public class LuaBehaviour : MonoBehaviour
     public TextAsset scriptAsset;
     public bool runOnStart = true;
 
+    [Header("Run Control")]
+    [Tooltip("If false, update() will not call into Lua. Use StartRun()/StopRun()/ToggleRun().")]
+    public bool runEnabled = true;
+
+    [Tooltip("When stopping, snap back to the position captured at the moment the script began running.")]
+    public bool resetPositionOnStop = true;
+
     [Header("Current Lua (preview)")]
     [SerializeField, TextArea(6, 30)] private string _currentLuaPreview;
     public string CurrentLua => _currentLuaPreview;
 
     // MoonSharp VM + bindings
-    Script _script;
-    Table _self;
-    DynValue _fnStart, _fnUpdate, _fnOnCollision, _fnOnTrigger;
+    private Script _script;
+    private Table _self;
+    private DynValue _fnStart, _fnUpdate, _fnOnTrigger, _fnOnCollision, _fnOnStopOptional;
+
+    // Run-session state
+    private bool _hasRunStartPose;
+    private Vector3 _runStartPosition;
 
     void Awake()
     {
-        string src = scriptAsset != null ? scriptAsset.text : (inlineScript ?? string.Empty);
-        _currentLuaPreview = src;        // show in Inspector immediately
-        CompileBind(src);
+        // Safe: okay to call multiple times; registers all public userdata types in loaded assemblies.
+        UserData.RegisterAssembly();
     }
 
     void Start()
     {
-        if (runOnStart) SafeCall(_fnStart);
+        var src = !string.IsNullOrEmpty(inlineScript) ? inlineScript :
+                  (scriptAsset != null ? scriptAsset.text : "");
+
+        if (!string.IsNullOrEmpty(src))
+        {
+            // Compile and bind, but do not auto-start yet; we’ll control start below
+            LoadScript(src, callStart: false);
+
+            if (runOnStart)
+                StartRun();
+        }
     }
 
     void Update()
     {
-        if (_fnUpdate != null && _fnUpdate.Type == DataType.Function)
+        if (!runEnabled) return;
+
+        if (_script != null && _fnUpdate != null && _fnUpdate.Type == DataType.Function)
         {
-            try { _script.Call(_fnUpdate, _self, DynValue.NewNumber(Time.deltaTime)); }
+            try
+            {
+                _script.Call(_fnUpdate, _self, DynValue.NewNumber(Time.deltaTime));
+            }
             catch (ScriptRuntimeException ex)
             {
                 Debug.LogError($"[Lua] update() error on '{name}': {ex.DecoratedMessage}");
@@ -44,23 +69,17 @@ public class LuaBehaviour : MonoBehaviour
         }
     }
 
-    void OnCollisionEnter(Collision collision)
+    public void Trigger()
     {
-        if (_fnOnCollision == null || _fnOnCollision.Type != DataType.Function) return;
-        try
-        {
-            var colProxy = new CollisionProxy(collision);
-            _script.Call(_fnOnCollision, _self, UserData.Create(colProxy));
-        }
-        catch (ScriptRuntimeException ex)
-        {
-            Debug.LogError($"[Lua] on_collision() error on '{name}': {ex.DecoratedMessage}");
-        }
+        if (!runEnabled) return;
+        SafeCall(_fnOnTrigger);
     }
 
     void OnTriggerEnter(Collider other)
     {
+        if (!runEnabled) return;
         if (_fnOnTrigger == null || _fnOnTrigger.Type != DataType.Function) return;
+
         try
         {
             var otherProxy = new GameObjectProxy(other.gameObject);
@@ -72,107 +91,178 @@ public class LuaBehaviour : MonoBehaviour
         }
     }
 
-    // Public helpers (useful for UI/generator)
-    public void CallStart() => SafeCall(_fnStart);
-
-    public void CallTrigger()
+    void OnCollisionEnter(Collision col)
     {
-        if (_fnOnTrigger != null && _fnOnTrigger.Type == DataType.Function)
+        if (!runEnabled) return;
+        if (_fnOnCollision == null || _fnOnCollision.Type != DataType.Function) return;
+
+        try
         {
-            try { _script.Call(_fnOnTrigger, _self, DynValue.Nil); }
-            catch (ScriptRuntimeException ex)
+            var colProxy = new CollisionProxy(col);
+            _script.Call(_fnOnCollision, _self, UserData.Create(colProxy));
+        }
+        catch (ScriptRuntimeException ex)
+        {
+            Debug.LogError($"[Lua] on_collision() error on '{name}': {ex.DecoratedMessage}");
+        }
+    }
+
+    /// <summary>
+    /// Compiles & loads the Lua script and caches function handles.
+    /// If callStart==true, also enables running, captures pose, and calls start(self).
+    /// </summary>
+    public void LoadScript(string luaText, bool callStart = true)
+    {
+        if (string.IsNullOrEmpty(luaText))
+        {
+            Debug.LogWarning($"[Lua] Empty script on {name}");
+            return;
+        }
+
+        _currentLuaPreview = luaText ?? string.Empty;
+
+        try
+        {
+            CompileBind(luaText);
+
+            if (callStart)
             {
-                Debug.LogError($"[Lua] on_trigger() error on '{name}': {ex.DecoratedMessage}");
+                // ensure we’re in a running state
+                runEnabled = true;
+                CaptureRunStartPose();
+                SafeCall(_fnStart);
+            }
+        }
+        catch (SyntaxErrorException ex)
+        {
+            Debug.LogError($"[Lua] Syntax error on '{name}': {ex.DecoratedMessage}");
+            _fnStart = _fnUpdate = _fnOnCollision = _fnOnTrigger = _fnOnStopOptional = null;
+        }
+        catch (ScriptRuntimeException ex)
+        {
+            Debug.LogError($"[Lua] Runtime error on '{name}': {ex.DecoratedMessage}");
+            _fnStart = _fnUpdate = _fnOnCollision = _fnOnTrigger = _fnOnStopOptional = null;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[Lua] General error on '{name}': {ex.Message}");
+            _fnStart = _fnUpdate = _fnOnCollision = _fnOnTrigger = _fnOnStopOptional = null;
+        }
+    }
+
+    // ===== Run control API =====
+
+    /// <summary>Enable/disable running. When turning on, captures the run-start position and calls Lua start(). When turning off, snaps back to the captured position.</summary>
+    public void SetRunning(bool on)
+    {
+        if (on)
+        {
+            if (!runEnabled)
+            {
+                runEnabled = true;
+                CaptureRunStartPose();
+                SafeCall(_fnStart);
+            }
+        }
+        else
+        {
+            if (runEnabled)
+            {
+                runEnabled = false;
+                // optional user hook
+                SafeCall(_fnOnStopOptional);
+                if (resetPositionOnStop && _hasRunStartPose)
+                    transform.position = _runStartPosition;
             }
         }
     }
 
-    public void LoadScript(string code, bool callStart = true)
+    public void StartRun() => SetRunning(true);
+    public void StopRun()  => SetRunning(false);
+    public void ToggleRun() => SetRunning(!runEnabled);
+
+    public void ResetToRunStartPosition()
     {
-        _currentLuaPreview = code ?? string.Empty;  // keep Inspector preview in sync
-        CompileBind(_currentLuaPreview);
-        if (callStart) SafeCall(_fnStart);
+        if (_hasRunStartPose)
+            transform.position = _runStartPosition;
     }
 
-    // Core: build a fresh VM and bind functions each time
-    void CompileBind(string src)
+    // ===== Internals =====
+
+    private void CompileBind(string src)
     {
-        try
+        // New VM with your proxy-based environment
+        _script = new Script(CoreModules.Preset_Default);
+
+        // Register proxy types (safe to call multiple times)
+        UserData.RegisterType<Vector3Proxy>();
+        UserData.RegisterType<GameObjectProxy>();
+        UserData.RegisterType<TransformProxy>();
+        UserData.RegisterType<RigidbodyProxy>();
+        UserData.RegisterType<ParticleSystemProxy>();
+        UserData.RegisterType<AudioSourceProxy>();
+        UserData.RegisterType<AnimatorProxy>();
+        UserData.RegisterType<TextProxy>();
+        UserData.RegisterType<ButtonProxy>();
+        UserData.RegisterType<CollisionProxy>();
+        UserData.RegisterType<LuaDOTween>();
+
+        // Globals: helpers + DOTween bridge
+        _script.Globals["dotween"] = new LuaDOTween();
+        _script.Globals["log"] = (Action<string>)((s) => Debug.Log($"[Lua] {s}"));
+        _script.Globals["warn"] = (Action<string>)((s) => Debug.LogWarning($"[Lua] {s}"));
+        _script.Globals["error"] = (Action<string>)((s) => Debug.LogError($"[Lua] {s}"));
+        _script.Globals["time_seconds"] = (Func<double>)(() => (double)Time.timeAsDouble);
+        _script.Globals["find_go"] = (Func<string, GameObjectProxy>)(name =>
         {
-            // New VM
-            _script = new Script(CoreModules.Preset_Default);
+            var go = GameObject.Find(name);
+            return go ? new GameObjectProxy(go) : null;
+        });
 
-            // Register proxies (safe to call repeatedly)
-            UserData.RegisterType<Vector3Proxy>();   // <-- NEW: must be before TransformProxy usage
-            UserData.RegisterType<GameObjectProxy>();
-            UserData.RegisterType<TransformProxy>();
-            UserData.RegisterType<RigidbodyProxy>();
-            UserData.RegisterType<ParticleSystemProxy>();
-            UserData.RegisterType<AudioSourceProxy>();
-            UserData.RegisterType<AnimatorProxy>();
-            UserData.RegisterType<TextProxy>();
-            UserData.RegisterType<ButtonProxy>();
-            UserData.RegisterType<CollisionProxy>();
-            UserData.RegisterType<LuaDOTween>();
+        // Build 'self' table with proxies for THIS GameObject
+        _self = DynValue.NewTable(_script).Table;
 
-            // Helpers and DOTween bridge
-            _script.Globals["dotween"] = new LuaDOTween();
-            _script.Globals["log"] = (Action<string>)((s) => Debug.Log($"[Lua] {s}"));
-            _script.Globals["warn"] = (Action<string>)((s) => Debug.LogWarning($"[Lua] {s}"));
-            _script.Globals["error"] = (Action<string>)((s) => Debug.LogError($"[Lua] {s}"));
-            _script.Globals["time_seconds"] = (Func<double>)(() => (double)Time.timeAsDouble);
-            _script.Globals["find_go"] = (Func<string, GameObjectProxy>)(name =>
-            {
-                var go = GameObject.Find(name);
-                return go ? new GameObjectProxy(go) : null;
-            });
+        var goProxy = new GameObjectProxy(gameObject);
+        _self["gameObject"] = UserData.Create(goProxy);
+        _self["transform"]  = UserData.Create(goProxy.GetTransformProxy());
 
-            // Rebuild 'self' on this VM
-            _self = DynValue.NewTable(_script).Table;
-            var goProxy = new GameObjectProxy(gameObject);
-            _self["gameObject"] = UserData.Create(goProxy);
-            _self["transform"]  = UserData.Create(goProxy.GetTransformProxy());
+        var rbProxy = goProxy.GetRigidbodyProxy();           if (rbProxy != null)       _self["rigidbody"] = UserData.Create(rbProxy);
+        var psProxy = goProxy.GetParticleSystemProxy();      if (psProxy != null)       _self["particle"]  = UserData.Create(psProxy);
+        var audioProxy = goProxy.GetAudioSourceProxy();      if (audioProxy != null)    _self["audio"]     = UserData.Create(audioProxy);
+        var animatorProxy = goProxy.GetAnimatorProxy();      if (animatorProxy != null) _self["animator"]  = UserData.Create(animatorProxy);
 
-            var rbProxy = goProxy.GetRigidbodyProxy();           if (rbProxy != null)       _self["rigidbody"] = UserData.Create(rbProxy);
-            var psProxy = goProxy.GetParticleSystemProxy();      if (psProxy != null)       _self["particle"]  = UserData.Create(psProxy);
-            var audioProxy = goProxy.GetAudioSourceProxy();      if (audioProxy != null)    _self["audio"]     = UserData.Create(audioProxy);
-            var animatorProxy = goProxy.GetAnimatorProxy();      if (animatorProxy != null) _self["animator"]  = UserData.Create(animatorProxy);
+        _script.Globals["self"] = _self;
 
-            _script.Globals["self"] = _self;
+        // Compile & run chunk (defines start/update/etc.)
+        _script.DoString(src ?? string.Empty);
 
-            // Compile
-            _script.DoString(src ?? string.Empty);
+        // Cache functions
+        _fnStart       = _script.Globals.Get("start");
+        _fnUpdate      = _script.Globals.Get("update");
+        _fnOnTrigger   = _script.Globals.Get("on_trigger");
+        _fnOnCollision = _script.Globals.Get("on_collision");
+        _fnOnStopOptional = _script.Globals.Get("on_stop");
 
-            // Bind functions (contract: start(self), update(self, dt), etc.)
-            _fnStart       = _script.Globals.Get("start");
-            _fnUpdate      = _script.Globals.Get("update");
-            _fnOnCollision = _script.Globals.Get("on_collision");
-            _fnOnTrigger   = _script.Globals.Get("on_trigger");
+        // Keep preview synced
+        _currentLuaPreview = src ?? string.Empty;
 
-            // Keep preview synced
-            _currentLuaPreview = src ?? string.Empty;
-
-            Debug.Log($"[Lua] Bound on '{name}': start={_fnStart?.Type}, update={_fnUpdate?.Type}, on_collision={_fnOnCollision?.Type}, on_trigger={_fnOnTrigger?.Type}");
-        }
-        catch (SyntaxErrorException ex)
-        {
-            Debug.LogError($"[Lua] Syntax error in '{name}': {ex.DecoratedMessage}");
-            _fnStart = _fnUpdate = _fnOnCollision = _fnOnTrigger = null;
-        }
-        catch (ScriptRuntimeException ex)
-        {
-            Debug.LogError($"[Lua] Runtime init error in '{name}': {ex.DecoratedMessage}");
-            _fnStart = _fnUpdate = _fnOnCollision = _fnOnTrigger = null;
-        }
+        Debug.Log($"[Lua] Bound on '{name}': start={_fnStart?.Type}, update={_fnUpdate?.Type}, on_trigger={_fnOnTrigger?.Type}, on_collision={_fnOnCollision?.Type}");
     }
 
-    void SafeCall(DynValue fn)
+    private void CaptureRunStartPose()
+    {
+        _runStartPosition = transform.position;
+        _hasRunStartPose = true;
+    }
+
+    private void SafeCall(DynValue fn)
     {
         if (fn == null || fn.Type != DataType.Function) return;
         try { _script.Call(fn, _self); }
         catch (ScriptRuntimeException ex)
         {
-            Debug.LogError($"[Lua] Error on '{name}': {ex.DecoratedMessage}");
+            var msg = string.IsNullOrEmpty(ex.DecoratedMessage) ? ex.Message : ex.DecoratedMessage;
+            Debug.LogError($"[Lua] Error on '{name}': {msg}");
         }
     }
 }

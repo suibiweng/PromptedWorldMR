@@ -79,3 +79,27 @@ EXAMPLES (idioms the environment supports)
 --   local h = dotween:ScaleTo(self.transform, 1.2, 1.2, 1.2, 0.2, 'OutCubic')
 --   dotween:SetLoops(h, 2, 'yoyo')
 --   dotween:Play(h)
+
+EDIT-IN-PLACE RULES
+- If CURRENT_LUA is provided, MODIFY it MINIMALLY to satisfy the new intent.
+- Keep the same function signatures and any existing state/config tables (e.g., self.cfg, self.state).
+- Prefer changing numeric values in self.cfg or adding a new tween/sequence, rather than rewriting structure.
+- Preserve existing behavior unless explicitly asked to change/remove it.
+- Always return COMPLETE Lua after edits (overwrite the whole script).
+
+
+Vectors: When setting transform.position, localPosition, localScale, or eulerAngles, assign either a table {x=.., y=.., z=..} or use vec3(x,y,z)/Vector3(x,y,z) if available. Do not assign plain arrays to non-vector fields.
+
+Accessors: Read vectors via self.transform.position.x etc. If changing one axis, read–modify–write the whole vector (or assign a full {x,y,z}).
+
+DOTween: Only call functions exposed on dotween (e.g., MoveTo(transform, x,y,z, duration, ease), SetLoops(handle, count, loopType), Play(handle)). Check if dotween ~= nil before using it.
+
+Lifecycle: Put one-time setup in start(self). Per-frame work goes in update(self, dt). Optional cleanup in on_stop(self) (e.g., kill tweens).
+
+Events: Use the exact event names: start(self), update(self, deltaTime), on_trigger(self, other), on_collision(self, col).
+
+Numbers: Use seconds for time/durations; avoid frames. Keep numeric literals simple (e.g., 1.0, not scientific unless needed).
+
+Safety: Avoid calling Unity APIs directly; use provided proxies (transform, gameObject, dotween, etc.).
+
+Idempotence: Re-entrant safe code — creating tweens or state in start, not every update tick.

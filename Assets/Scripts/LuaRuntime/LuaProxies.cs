@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using MoonSharp.Interpreter;
+using System; 
 
 namespace LuaProxies
 {
@@ -56,72 +57,238 @@ namespace LuaProxies
     // TransformProxy: property-style access + helper methods
     // ------------------------------------------------------------
     [MoonSharpUserData]
-    public class TransformProxy
+       public class TransformProxy
     {
-        private readonly Transform _transform;
-        public TransformProxy(Transform transform) => _transform = transform;
+        internal readonly Transform _transform;
 
-        // Property-style access (lowercase to match typical Lua generations)
-        public Vector3Proxy position
+        public TransformProxy(Transform t)
+        {
+            _transform = t;
+        }
+
+        // ---- Basics ----
+        public string name
+        {
+            get => _transform.name;
+            set => _transform.name = value;
+        }
+
+        public GameObjectProxy gameObject => new GameObjectProxy(_transform.gameObject);
+
+        public TransformProxy parent
+        {
+            get => _transform.parent != null ? new TransformProxy(_transform.parent) : null;
+            set => _transform.parent = value != null ? value._transform : null;
+        }
+
+        // ---- Vector properties (get: Vector3Proxy, set: accepts Vector3 / Vector3Proxy / Lua table / DynValue / string "x,y,z") ----
+
+        public object position
         {
             get => new Vector3Proxy(_transform.position, v => _transform.position = v);
-            set
-            {
-                if (value != null) _transform.position = value.ToVector3();
-            }
+            set => _transform.position = CoerceToVector3(value, _transform.position);
         }
 
-        public Vector3Proxy localPosition
+        public object localPosition
         {
             get => new Vector3Proxy(_transform.localPosition, v => _transform.localPosition = v);
-            set
-            {
-                if (value != null) _transform.localPosition = value.ToVector3();
-            }
+            set => _transform.localPosition = CoerceToVector3(value, _transform.localPosition);
         }
 
-        public Vector3Proxy localScale
+        public object localScale
         {
             get => new Vector3Proxy(_transform.localScale, v => _transform.localScale = v);
-            set
-            {
-                if (value != null) _transform.localScale = value.ToVector3();
-            }
+            set => _transform.localScale = CoerceToVector3(value, _transform.localScale);
         }
 
-        public Vector3Proxy eulerAngles
+        public object eulerAngles
         {
             get => new Vector3Proxy(_transform.eulerAngles, v => _transform.eulerAngles = v);
-            set
-            {
-                if (value != null) _transform.eulerAngles = value.ToVector3();
-            }
+            set => _transform.eulerAngles = CoerceToVector3(value, _transform.eulerAngles);
         }
 
-        // Helper methods (keep for compatibility with older prompts)
-        public Vector3 GetPosition() => _transform.position;
-        public void SetPosition(Vector3 position) => _transform.position = position;
-        public void SetPosition(double x, double y, double z) =>
-            _transform.position = new Vector3((float)x, (float)y, (float)z);
+        // Common directional vectors
+        public object forward
+        {
+            get => new Vector3Proxy(_transform.forward, v => _transform.forward = v);
+            set => _transform.forward = CoerceToVector3(value, _transform.forward);
+        }
 
-        public Vector3 GetRotation() => _transform.eulerAngles;
-        public void SetRotation(Vector3 rotation) => _transform.eulerAngles = rotation;
-        public void SetRotation(double x, double y, double z) =>
-            _transform.eulerAngles = new Vector3((float)x, (float)y, (float)z);
+        public object up
+        {
+            get => new Vector3Proxy(_transform.up, v => _transform.up = v);
+            set => _transform.up = CoerceToVector3(value, _transform.up);
+        }
 
-        public Vector3 GetScale() => _transform.localScale;
-        public void SetScale(Vector3 scale) => _transform.localScale = scale;
-        public void SetScale(double x, double y, double z) =>
-            _transform.localScale = new Vector3((float)x, (float)y, (float)z);
+        public object right
+        {
+            get => new Vector3Proxy(_transform.right, v => _transform.right = v);
+            set => _transform.right = CoerceToVector3(value, _transform.right);
+        }
 
-        public void Translate(Vector3 delta) => _transform.Translate(delta, Space.World);
-        public void Translate(double x, double y, double z) =>
-            _transform.Translate(new Vector3((float)x, (float)y, (float)z), Space.World);
+        // ---- Convenience methods (also accept table/DynValue for vectors) ----
 
-        public void Rotate(Vector3 rotation) => _transform.Rotate(rotation);
-        public void Rotate(double x, double y, double z) =>
-            _transform.Rotate(new Vector3((float)x, (float)y, (float)z));
+        public void Translate(object delta) =>
+            _transform.Translate(CoerceToVector3(delta, Vector3.zero), Space.Self);
+
+        public void TranslateWorld(object delta) =>
+            _transform.Translate(CoerceToVector3(delta, Vector3.zero), Space.World);
+
+        public void Rotate(object eulerDelta) =>
+            _transform.Rotate(CoerceToVector3(eulerDelta, Vector3.zero), Space.Self);
+
+        public void RotateWorld(object eulerDelta) =>
+            _transform.Rotate(CoerceToVector3(eulerDelta, Vector3.zero), Space.World);
+
+        public void LookAt(GameObjectProxy target)
+        {
+            if (target == null) return;
+            _transform.LookAt(target._gameObject.transform);
+        }
+
+        public void LookAt(TransformProxy target)
+        {
+            if (target == null) return;
+            _transform.LookAt(target._transform);
+        }
+
+        public void LookAt(object worldPoint)
+        {
+            var p = CoerceToVector3(worldPoint, _transform.position + _transform.forward);
+            _transform.LookAt(p);
+        }
+
+        // ---- Internal coercion helper ----
+        // Accepts:
+        // - UnityEngine.Vector3
+        // - Vector3Proxy
+        // - MoonSharp DynValue wrapping userdata (Vector3Proxy/Vector3) or a table
+        // - MoonSharp Table {x=..,y=..,z=..} or {..,..,..}
+        // - string "x,y,z"
+        private static Vector3 CoerceToVector3(object any, Vector3 fallback)
+        {
+            if (any == null) return fallback;
+
+            // Exact types
+            if (any is Vector3 v3) return v3;
+            if (any is Vector3Proxy vp) return vp.ToVector3();
+
+            // MoonSharp DynValue
+            if (any is DynValue dv)
+            {
+                if (dv.Type == DataType.UserData && dv.UserData != null)
+                {
+                    var obj = dv.UserData.Object;
+                    if (obj is Vector3Proxy vpu) return vpu.ToVector3();
+                    if (obj is Vector3 v32) return v32;
+                }
+
+                if (dv.Type == DataType.Table)
+                    return TableToVector3(dv.Table, fallback);
+            }
+
+            // Direct Table
+            if (any is Table tb)
+                return TableToVector3(tb, fallback);
+
+            // "x,y,z"
+            if (any is string s)
+            {
+                var parts = s.Split(',');
+                if (parts.Length >= 3 &&
+                    float.TryParse(parts[0], out var sx) &&
+                    float.TryParse(parts[1], out var sy) &&
+                    float.TryParse(parts[2], out var sz))
+                {
+                    return new Vector3(sx, sy, sz);
+                }
+            }
+
+            return fallback;
+        }
+
+        private static Vector3 TableToVector3(Table t, Vector3 fallback)
+        {
+            if (t == null) return fallback;
+
+            float Read(string name, int idx)
+            {
+                var dv = t.Get(name);
+                if (dv.IsNil()) dv = t.Get(idx);
+                if (dv.IsNil()) return 0f;
+                try { return Convert.ToSingle(dv.ToObject()); }
+                catch { return 0f; }
+            }
+
+            return new Vector3(Read("x", 1), Read("y", 2), Read("z", 3));
+        }
     }
+    // public class TransformProxy
+    // {
+    //     private readonly Transform _transform;
+    //     public TransformProxy(Transform transform) => _transform = transform;
+
+    //     // Property-style access (lowercase to match typical Lua generations)
+    //     public Vector3Proxy position
+    //     {
+    //         get => new Vector3Proxy(_transform.position, v => _transform.position = v);
+    //         set
+    //         {
+    //             if (value != null) _transform.position = value.ToVector3();
+    //         }
+    //     }
+
+    //     public Vector3Proxy localPosition
+    //     {
+    //         get => new Vector3Proxy(_transform.localPosition, v => _transform.localPosition = v);
+    //         set
+    //         {
+    //             if (value != null) _transform.localPosition = value.ToVector3();
+    //         }
+    //     }
+
+    //     public Vector3Proxy localScale
+    //     {
+    //         get => new Vector3Proxy(_transform.localScale, v => _transform.localScale = v);
+    //         set
+    //         {
+    //             if (value != null) _transform.localScale = value.ToVector3();
+    //         }
+    //     }
+
+    //     public Vector3Proxy eulerAngles
+    //     {
+    //         get => new Vector3Proxy(_transform.eulerAngles, v => _transform.eulerAngles = v);
+    //         set
+    //         {
+    //             if (value != null) _transform.eulerAngles = value.ToVector3();
+    //         }
+    //     }
+
+    //     // Helper methods (keep for compatibility with older prompts)
+    //     public Vector3 GetPosition() => _transform.position;
+    //     public void SetPosition(Vector3 position) => _transform.position = position;
+    //     public void SetPosition(double x, double y, double z) =>
+    //         _transform.position = new Vector3((float)x, (float)y, (float)z);
+
+    //     public Vector3 GetRotation() => _transform.eulerAngles;
+    //     public void SetRotation(Vector3 rotation) => _transform.eulerAngles = rotation;
+    //     public void SetRotation(double x, double y, double z) =>
+    //         _transform.eulerAngles = new Vector3((float)x, (float)y, (float)z);
+
+    //     public Vector3 GetScale() => _transform.localScale;
+    //     public void SetScale(Vector3 scale) => _transform.localScale = scale;
+    //     public void SetScale(double x, double y, double z) =>
+    //         _transform.localScale = new Vector3((float)x, (float)y, (float)z);
+
+    //     public void Translate(Vector3 delta) => _transform.Translate(delta, Space.World);
+    //     public void Translate(double x, double y, double z) =>
+    //         _transform.Translate(new Vector3((float)x, (float)y, (float)z), Space.World);
+
+    //     public void Rotate(Vector3 rotation) => _transform.Rotate(rotation);
+    //     public void Rotate(double x, double y, double z) =>
+    //         _transform.Rotate(new Vector3((float)x, (float)y, (float)z));
+    // }
 
     // ------------------------------------------------------------
     // GameObjectProxy
@@ -129,7 +296,7 @@ namespace LuaProxies
     [MoonSharpUserData]
     public class GameObjectProxy
     {
-        private readonly GameObject _gameObject;
+        public GameObject _gameObject;
         public GameObjectProxy(GameObject gameObject) => _gameObject = gameObject;
 
         public string GetName() => _gameObject.name;
