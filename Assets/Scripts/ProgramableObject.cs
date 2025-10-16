@@ -288,7 +288,10 @@ public class ProgramableObject : MonoBehaviour
     {
         // Keep your existing selection behavior
         if (promptedWorldManager != null)
+        {
             promptedWorldManager.selectedObject = this.gameObject;
+         //   FindAnyObjectByType<OpenAILuaGenerator>().AssignTarget(promptedWorldManager.selectedObject);
+        }
 
         // Custom code on select enter (e.g., lua trigger)
         // if (TryGetComponent<LuaBehaviour>(out var lua)) lua.Trigger();

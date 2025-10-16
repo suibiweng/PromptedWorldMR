@@ -42,7 +42,7 @@ public class LuaPromptUI : MonoBehaviour
     // Called by RaycastTargetPicker after user clicks an object
     public void OnPickedTarget(GameObject go)
     {
-        SetTarget(go);
+       // SetTarget(go);
     }
 
     private void SetTarget(GameObject go)
@@ -70,6 +70,8 @@ public class LuaPromptUI : MonoBehaviour
             UpdateStatus("Generator missing in scene.");
             return;
         }
+        
+        
         if (!currentTarget)
         {
             UpdateStatus("Pick a target first.");
@@ -80,7 +82,6 @@ public class LuaPromptUI : MonoBehaviour
 
         UpdateStatus("Current target: " + currentTarget.name  );
             
-
         }
 
         // Apply UI -> generator

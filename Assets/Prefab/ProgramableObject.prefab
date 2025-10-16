@@ -685,6 +685,7 @@ GameObject:
   - component: {fileID: 4841036895249162438}
   - component: {fileID: 6842033889762767591}
   - component: {fileID: 918196740110979837}
+  - component: {fileID: -4033489437336678575}
   m_Layer: 0
   m_Name: ProgramableObject
   m_TagString: Untagged
@@ -928,6 +929,22 @@ MonoBehaviour:
   precomputeOutline: 0
   bakeKeys: []
   bakeValues: []
+--- !u!114 &-4033489437336678575
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7692451994609705636}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 24cf117d5e3b4dc41afd4401b83f47fe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  inlineScript: 
+  scriptAsset: {fileID: 0}
+  runOnStart: 1
+  _currentLuaPreview: 
 --- !u!1 &8102332530202665709
 GameObject:
   m_ObjectHideFlags: 0

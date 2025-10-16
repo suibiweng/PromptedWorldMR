@@ -244,4 +244,97 @@ public class PromptedWorldManager : MonoBehaviour
         }
         foreach (var r in toRemove) _trackedMap.Remove(r);
     }
+
+    // === Add inside PromptedWorldManager ===
+
+// Run Lua on ALL tracked ProgramableObjects
+[ContextMenu("Lua • Run All")]
+public void RunAll()
+{
+    foreach (var p in _all)
+    {
+        if (p == null) continue;
+        var lb = p.GetComponent<LuaBehaviour>();
+        if (lb == null) continue;
+
+        // ensure a script is loaded; if you rely on generation only, this may be empty.
+        // Start the run session (captures run-start pose + calls start()).
+        lb.StartRun();
+    }
+}
+
+// Stop Lua on ALL tracked ProgramableObjects
+// snapToStartPose: if true, each object snaps back to its 'run-start' position (the moment StartRun() was called)
+[ContextMenu("Lua • Stop All")]
+public void StopAll(bool snapToStartPose = true)
+{
+    foreach (var p in _all)
+    {
+        if (p == null) continue;
+        var lb = p.GetComponent<LuaBehaviour>();
+        if (lb == null) continue;
+
+        // Temporarily enforce snap behavior if requested
+        bool prev = lb.resetPositionOnStop;
+        lb.resetPositionOnStop = snapToStartPose;
+        lb.StopRun();
+        lb.resetPositionOnStop = prev;
+    }
+}
+
+// Optional: only Real objects
+[ContextMenu("Lua • Run All (Real)")]
+public void RunAllReal()
+{
+    foreach (var p in _realObjects)
+    {
+        if (p == null) continue;
+        var lb = p.GetComponent<LuaBehaviour>();
+        if (lb != null) lb.StartRun();
+    }
+}
+
+[ContextMenu("Lua • Stop All (Real)")]
+public void StopAllReal(bool snapToStartPose = true)
+{
+    foreach (var p in _realObjects)
+    {
+        if (p == null) continue;
+        var lb = p.GetComponent<LuaBehaviour>();
+        if (lb == null) continue;
+        bool prev = lb.resetPositionOnStop;
+        lb.resetPositionOnStop = snapToStartPose;
+        lb.StopRun();
+        lb.resetPositionOnStop = prev;
+    }
+}
+
+// Optional: only Virtual objects
+[ContextMenu("Lua • Run All (Virtual)")]
+public void RunAllVirtual()
+{
+    foreach (var p in _virtualObjects)
+    {
+        if (p == null) continue;
+        var lb = p.GetComponent<LuaBehaviour>();
+        if (lb != null) lb.StartRun();
+    }
+}
+
+[ContextMenu("Lua • Stop All (Virtual)")]
+public void StopAllVirtual(bool snapToStartPose = true)
+{
+    foreach (var p in _virtualObjects)
+    {
+        if (p == null) continue;
+        var lb = p.GetComponent<LuaBehaviour>();
+        if (lb == null) continue;
+        bool prev = lb.resetPositionOnStop;
+        lb.resetPositionOnStop = snapToStartPose;
+        lb.StopRun();
+        lb.resetPositionOnStop = prev;
+    }
+}
+
+
 }
