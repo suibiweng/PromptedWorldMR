@@ -3,42 +3,68 @@ using UnityEngine;
 
 public class PassthroughCropper_External : System.IDisposable
 {
-    readonly Material _warpMat;
-    readonly RenderTexture _outRT;
+    // removed 'readonly' so we can assign in Init()
+    private Material _warpMat;
+    private RenderTexture _outRT;
 
-    public int OutputWidth  { get; }
-    public int OutputHeight { get; }
+    public int OutputWidth  { get; private set; }
+    public int OutputHeight { get; private set; }
 
-    /// outW/outH = resolution of the rectified crop you want (e.g., 512x512)
+    // Original ctor (kept, but throws if shader not found)
     public PassthroughCropper_External(int outW = 512, int outH = 512)
+    {
+        var sh = Shader.Find("Hidden/QuadHomographyWarp");
+        if (sh == null)
+            throw new System.ArgumentException("Warp shader not found. Assign a Shader/Material via the other constructor, or ensure 'Hidden/QuadHomographyWarp' exists.");
+        Init(outW, outH, new Material(sh));
+    }
+
+    // Preferred: pass a Shader from the Inspector
+    public PassthroughCropper_External(int outW, int outH, Shader warpShader)
+    {
+        if (warpShader == null) throw new System.ArgumentNullException(nameof(warpShader));
+        Init(outW, outH, new Material(warpShader));
+    }
+
+    // Or pass a Material that already uses the shader
+    public PassthroughCropper_External(int outW, int outH, Material warpMaterial)
+    {
+        if (warpMaterial == null) throw new System.ArgumentNullException(nameof(warpMaterial));
+        Init(outW, outH, new Material(warpMaterial)); // instance
+    }
+
+    private void Init(int outW, int outH, Material mat)
     {
         OutputWidth  = outW;
         OutputHeight = outH;
-        _warpMat = new Material(Shader.Find("Hidden/QuadHomographyWarp"));
-        _outRT   = new RenderTexture(outW, outH, 0, RenderTextureFormat.ARGB32) { filterMode = FilterMode.Bilinear };
+
+        _warpMat = mat;
+
+        _outRT = new RenderTexture(outW, outH, 0, RenderTextureFormat.ARGB32)
+        {
+            filterMode = FilterMode.Bilinear
+        };
         _outRT.Create();
     }
 
-    /// worldQuad: the 4 world points (any order). cam must match your passthrough render pose/FOV.
-    /// passthroughTex: the texture you render for passthrough (Texture or RenderTexture).
     public Texture2D Crop(Camera cam, IReadOnlyList<Vector3> worldQuad, Texture passthroughTex, bool flipY = true)
     {
-        if (cam == null || worldQuad == null || worldQuad.Count != 4 || passthroughTex == null)
+        if (cam == null || worldQuad == null || worldQuad.Count != 4 || passthroughTex == null || _warpMat == null)
         {
-            Debug.LogWarning("[PassthroughCropper_External] Invalid inputs.");
+            Debug.LogWarning("[PassthroughCropper_External] Invalid inputs or warp material missing.");
             return null;
         }
 
-        // 1) ensure we have a readable CPU texture of the passthrough frame
+        // Readable CPU texture for sampling
         var readable = (passthroughTex is Texture2D t2d && t2d.isReadable) ? t2d : TextureReadback.ToReadable(passthroughTex);
 
-        // 2) project world points -> viewport -> image pixels
+        // Project world → image pixels
         var px = WorldPointsToImagePixels(cam, worldQuad, readable.width, readable.height, flipY);
 
-        // 3) order image-space quad TL,TR,BR,BL
+        // Order TL,TR,BR,BL in image space
         var ordered = OrderImageQuadTLTRBRBL(px);
 
-        // 4) set shader params as normalized UVs
+        // Set normalized UV corners
         Vector2[] uv = new Vector2[4];
         for (int i = 0; i < 4; i++)
         {
@@ -54,9 +80,10 @@ public class PassthroughCropper_External : System.IDisposable
         _warpMat.SetVector("_P2", new Vector4(uv[2].x, uv[2].y, 0, 0));
         _warpMat.SetVector("_P3", new Vector4(uv[3].x, uv[3].y, 0, 0));
 
-        // 5) GPU warp to RT, then read back to Texture2D (CPU)
+        // GPU warp → RT
         Graphics.Blit(null, _outRT, _warpMat);
 
+        // Readback to Texture2D
         var prev = RenderTexture.active;
         RenderTexture.active = _outRT;
         var outTex = new Texture2D(OutputWidth, OutputHeight, TextureFormat.RGBA32, false, false);
@@ -75,8 +102,7 @@ public class PassthroughCropper_External : System.IDisposable
     }
 
     // ---------- helpers ----------
-
-    static Vector2Int[] WorldPointsToImagePixels(Camera cam, IReadOnlyList<Vector3> worldPts, int w, int h, bool flipY)
+    private static Vector2Int[] WorldPointsToImagePixels(Camera cam, IReadOnlyList<Vector3> worldPts, int w, int h, bool flipY)
     {
         var outPix = new Vector2Int[worldPts.Count];
         for (int i = 0; i < worldPts.Count; i++)
@@ -84,23 +110,24 @@ public class PassthroughCropper_External : System.IDisposable
             Vector3 v = cam.WorldToViewportPoint(worldPts[i]);
             float u = Mathf.Clamp01(v.x);
             float vv = Mathf.Clamp01(v.y);
-            if (flipY) vv = 1f - vv; // many camera frames appear vertically flipped
+            if (flipY) vv = 1f - vv;
 
-            int x = Mathf.RoundToInt(u  * (w - 1));
-            int y = Mathf.RoundToInt(vv * (h - 1));
-            outPix[i] = new Vector2Int(x, y);
+            outPix[i] = new Vector2Int(
+                Mathf.RoundToInt(u  * (w - 1)),
+                Mathf.RoundToInt(vv * (h - 1))
+            );
         }
         return outPix;
     }
 
-    static Vector2Int[] OrderImageQuadTLTRBRBL(Vector2Int[] quadPx)
+    public static Vector2Int[] OrderImageQuadTLTRBRBL(Vector2Int[] quadPx)
     {
         var arr = (Vector2Int[])quadPx.Clone();
-        System.Array.Sort(arr, (a, b) => a.y.CompareTo(b.y)); // top two first (smaller y is top in image space)
+        System.Array.Sort(arr, (a, b) => a.y.CompareTo(b.y)); // small y = top
         var top2 = new[] { arr[0], arr[1] };
         var bot2 = new[] { arr[2], arr[3] };
-        System.Array.Sort(top2, (a, b) => a.x.CompareTo(b.x)); // left-to-right
+        System.Array.Sort(top2, (a, b) => a.x.CompareTo(b.x)); // left→right
         System.Array.Sort(bot2, (a, b) => a.x.CompareTo(b.x));
-        return new[] { top2[0], top2[1], bot2[1], bot2[0] }; // TL, TR, BR, BL
+        return new[] { top2[0], top2[1], bot2[1], bot2[0] };   // TL, TR, BR, BL
     }
 }

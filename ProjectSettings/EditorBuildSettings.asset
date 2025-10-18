@@ -6,6 +6,12 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/RayCastSelector.unity
+    guid: c1a3f01d87045b047ad6fc948bf425e9
+  - enabled: 1
+    path: Assets/MRUKSamples/Experimental/EnvironmentPanelPlacement/EnvironmentPanelPlacement.unity
+    guid: 01a2198db44a25d44a3108875f7fd3d5
+  - enabled: 1
     path: Assets/Scenes/Main.unity
     guid: 4177cb7b0d7d1884d8066ee2f04db555
   - enabled: 1

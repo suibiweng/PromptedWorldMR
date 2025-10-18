@@ -136,18 +136,6 @@ public class ProgramableObject : MonoBehaviour
 
     public bool hasLuaScript() => GetComponent<LuaBehaviour>() != null;
 
-    public void setLabel(string label)
-    {
-        if (TextBox != null) TextBox.text = label;
-    }
-
-    public void setImage(Texture texture)
-    {
-        if (Objimage == null) return;
-        Objimage.gameObject.SetActive(true);
-        Objimage.texture = texture;
-        Objimage.color = Color.white;
-    }
 
     public void setShape(GameObject obj)
     {
@@ -232,23 +220,7 @@ public class ProgramableObject : MonoBehaviour
             selectOutline.enabled = on;
     }
 
-    // ========== PROXIMITY ==========
 
-    private void ProximityTouchingDetection()
-    {
-        var selfPos = transform.position;
-
-        bool leftClose = userLeftHand != null &&
-                         Vector3.Distance(userLeftHand.position, selfPos) < Touchingdistance;
-        bool rightClose = userRightHand != null &&
-                          Vector3.Distance(userRightHand.position, selfPos) < Touchingdistance;
-
-        isToching = leftClose || rightClose;
-
-        if (isToching && !_prevTouching) onProximityEnter?.Invoke();
-        if (!isToching && _prevTouching) onProximityExit?.Invoke();
-        _prevTouching = isToching;
-    }
 
     // ========== PUBLIC HELPERS FOR STICKY CONTROL ==========
 
@@ -384,4 +356,45 @@ public class ProgramableObject : MonoBehaviour
             return h.ToString("X8");
         }
     }
+
+    
+    // ========== PROXIMITY ==========
+
+    private void ProximityTouchingDetection()
+    {
+        var selfPos = transform.position;
+
+        bool leftClose = userLeftHand != null &&
+                         Vector3.Distance(userLeftHand.position, selfPos) < Touchingdistance;
+        bool rightClose = userRightHand != null &&
+                          Vector3.Distance(userRightHand.position, selfPos) < Touchingdistance;
+
+        isToching = leftClose || rightClose;
+
+        if (isToching && !_prevTouching) onProximityEnter?.Invoke();
+        if (!isToching && _prevTouching) onProximityExit?.Invoke();
+        _prevTouching = isToching;
+    }
+    
+    public void changeColor(Color color)
+    {
+        if (ShapeRenderer != null)
+        {
+            ShapeRenderer.material.color = color;
+        }
+    }
+
+    public void setLabel(string label)
+    {
+        if (TextBox != null) TextBox.text = label;
+    }
+
+    public void setImage(Texture texture)
+    {
+        if (Objimage == null) return;
+        Objimage.gameObject.SetActive(true);
+        Objimage.texture = texture;
+        Objimage.color = Color.white;
+    }
+
 }

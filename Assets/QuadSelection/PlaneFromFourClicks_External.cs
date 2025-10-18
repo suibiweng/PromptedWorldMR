@@ -43,7 +43,7 @@ public class PlaneFromFourClicks_External : MonoBehaviour
     void Update()
     {
         // optional: keyboard clear while testing in Editor
-        if (Input.GetKeyDown(KeyCode.R)) ClearPoints();
+  
         UpdatePreview();
     }
 

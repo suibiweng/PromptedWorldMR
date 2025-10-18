@@ -6,6 +6,7 @@ public static class TextureReadback
     {
         var rt = RenderTexture.GetTemporary(src.width, src.height, 0, RenderTextureFormat.ARGB32);
         Graphics.Blit(src, rt);
+
         var prev = RenderTexture.active;
         RenderTexture.active = rt;
 
