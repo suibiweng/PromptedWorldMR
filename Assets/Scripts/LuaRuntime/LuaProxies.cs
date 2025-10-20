@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using MoonSharp.Interpreter;
-using System; 
+using System;
 
 namespace LuaProxies
 {
@@ -57,7 +57,7 @@ namespace LuaProxies
     // TransformProxy: property-style access + helper methods
     // ------------------------------------------------------------
     [MoonSharpUserData]
-       public class TransformProxy
+    public class TransformProxy
     {
         internal readonly Transform _transform;
 
@@ -378,6 +378,21 @@ namespace LuaProxies
 
         public void AddForce(float x, float y, float z) => _rb.AddForce(new Vector3(x, y, z));
         public void SetVelocity(float x, float y, float z) => _rb.linearVelocity = new Vector3(x, y, z);
+        // --- Add to RigidbodyProxy ---
+
+        // Query current kinematic state
+        public bool GetIsKinematic() => _rb.isKinematic;
+
+        // Preferred setter (method-style API)
+        public void SetIsKinematic(bool k) => _rb.isKinematic = k;
+
+        // Back-compat alias (so Lua can call self.rigidbody:SetKinematic(false))
+        public void SetKinematic(bool k) => _rb.isKinematic = k;
+
+        // Optional: gravity getter for symmetry with SetUseGravity(...)
+        public bool GetUseGravity() => _rb.useGravity;
+
+
 
         public void AddForce(Vector3 force, string mode)
         {
@@ -450,15 +465,27 @@ namespace LuaProxies
         private readonly Collision _collision;
         public CollisionProxy(Collision collision) => _collision = collision;
 
-        public GameObjectProxy GetGameObject() =>
-            _collision != null && _collision.gameObject != null ? new GameObjectProxy(_collision.gameObject) : null;
+        public GameObjectProxy GetGameObject()
+            => (_collision != null && _collision.gameObject != null) ? new GameObjectProxy(_collision.gameObject) : null;
 
-        public Vector3 GetContactPoint() =>
-            _collision != null && _collision.contacts.Length > 0 ? _collision.contacts[0].point : Vector3.zero;
+        // --- patched: return Vector3Proxy instead of UnityEngine.Vector3 ---
+        public Vector3Proxy GetContactPoint()
+        {
+            var p = (_collision != null && _collision.contacts != null && _collision.contacts.Length > 0)
+                ? _collision.contacts[0].point
+                : Vector3.zero;
+            return new Vector3Proxy(p);
+        }
 
-        public Vector3 GetRelativeVelocity() => _collision != null ? _collision.relativeVelocity : Vector3.zero;
+        // --- patched: return Vector3Proxy instead of UnityEngine.Vector3 ---
+        public Vector3Proxy GetRelativeVelocity()
+        {
+            var v = (_collision != null) ? _collision.relativeVelocity : Vector3.zero;
+            return new Vector3Proxy(v);
+        }
 
-        public string GetName() => _collision != null && _collision.gameObject != null ? _collision.gameObject.name : null;
+        public string GetName()
+            => (_collision != null && _collision.gameObject != null) ? _collision.gameObject.name : string.Empty;
 
         public RigidbodyProxy GetRigidbodyProxy()
         {
@@ -471,7 +498,20 @@ namespace LuaProxies
 
             return null;
         }
+
+        // (optional helpers, safe to keep or remove)
+        public int GetContactCount()
+            => (_collision != null && _collision.contacts != null) ? _collision.contacts.Length : 0;
+
+        public Vector3Proxy GetContactNormal()
+        {
+            var n = (_collision != null && _collision.contacts != null && _collision.contacts.Length > 0)
+                ? _collision.contacts[0].normal
+                : Vector3.up;
+            return new Vector3Proxy(n);
+        }
     }
+
 
     // ------------------------------------------------------------
     // ParticleSystemProxy
@@ -505,4 +545,104 @@ namespace LuaProxies
         public void SetBool(string name, bool value) => _anim.SetBool(name, value);
         public void SetTrigger(string name) => _anim.SetTrigger(name);
     }
+
+
+
+
+
+
+    // =========================
+// ProgramableObjectProxy
+// =========================
+[MoonSharpUserData]
+public class ProgramableObjectProxy
+{
+    private readonly ProgramableObject _po;
+
+    public ProgramableObjectProxy(ProgramableObject po)
+    {
+        _po = po;
+    }
+
+    // ---- Identity / flags ----
+    public string GetId() => _po != null ? _po.id : "";
+    public bool GetIsRealObject() => _po != null && _po.isRealObject;
+
+    // ---- Label / visuals ----
+    public void SetLabel(string label)
+    {
+        if (_po != null) _po.setLabel(label);
+    }
+
+    // RGBA 0..1
+    public void SetColor(float r, float g, float b, float a = 1f)
+    {
+        if (_po != null) _po.changeColor(new UnityEngine.Color(r, g, b, a));
+    }
+
+    // ---- Highlight controls (sticky latch) ----
+    public void ToggleLatchedHighlight()
+    {
+        if (_po != null) _po.ToggleLatchedHighlight();
+    }
+
+    public void SetLatchedHighlight(bool on)
+    {
+        if (_po != null) _po.SetLatchedHighlight(on);
+    }
+
+    public void ClearLatchedHighlight()
+    {
+        if (_po != null) _po.ClearLatchedHighlight();
+    }
+
+    // Update the current visual state without changing it (forces refresh)
+    public void RefreshHighlight()
+    {
+        if (_po != null) _po.SetLatchedHighlight(_po.highlightLatched);
+    }
+
+    // When true, outline can show on hover (when sticky isn’t used)
+    public bool GetHighlightOnHover() => _po != null && _po.highlightOnHover;
+    public void SetHighlightOnHover(bool enable)
+    {
+        if (_po == null) return;
+        _po.highlightOnHover = enable;
+        // force a visual refresh
+        _po.SetLatchedHighlight(_po.highlightLatched);
+    }
+
+    public bool GetStickyHighlightEnabled() => _po != null && _po.stickyHighlightEnabled;
+    public void SetStickyHighlightEnabled(bool enable)
+    {
+        if (_po == null) return;
+        _po.stickyHighlightEnabled = enable;
+        _po.SetLatchedHighlight(_po.highlightLatched);
+    }
+
+    // ---- Proximity / selection readouts ----
+    public bool GetIsTouching() => _po != null && _po.isToching;
+    public float GetTouchDistance() => _po != null ? _po.Touchingdistance : 0f;
+    public void SetTouchDistance(float d)
+    {
+        if (_po == null) return;
+        _po.Touchingdistance = Mathf.Max(0.001f, d);
+    }
+
+    public bool GetIsSelected() => _po != null && _po._selected;
+    public bool GetIsHovering() => _po != null && _po._hovering;
+
+    // ---- Image (optional; only useful if you pass a Texture via C#) ----
+    public void SetImage(Texture tex)
+    {
+        if (_po != null) _po.setImage(tex);
+    }
 }
+
+}
+
+
+
+
+
+

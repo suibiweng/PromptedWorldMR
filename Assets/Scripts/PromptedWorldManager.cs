@@ -12,9 +12,6 @@ public class PromptedWorldManager : MonoBehaviour
     public Transform userLeftHand;
     public Transform userRightHand;
 
-    public OVRHand ovrleftHand;
-    public OVRHand ovrrightHand;
-
     [Header("Spawning / Prefabs")]
     [Tooltip("Prefab that contains a ProgramableObject component.")]
     public GameObject ProgramableObjectPrefab;

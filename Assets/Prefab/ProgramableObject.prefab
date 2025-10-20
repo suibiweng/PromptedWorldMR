@@ -800,7 +800,7 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 1
+  m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
@@ -944,6 +944,16 @@ MonoBehaviour:
   inlineScript: 
   scriptAsset: {fileID: 0}
   runOnStart: 1
+  runEnabled: 1
+  resetPositionOnStop: 1
+  addRigidbodyIfMissing: 1
+  rbKinematicDefault: 1
+  rbUseGravityDefault: 0
+  rbMassDefault: 1
+  addAudioSourceIfMissing: 1
+  addParticleSystemIfMissing: 1
+  addAnimatorIfMissing: 0
+  addBoxColliderIfMissing: 0
   _currentLuaPreview: 
 --- !u!1 &8102332530202665709
 GameObject:

@@ -358,7 +358,7 @@ public class ProgramableObject : MonoBehaviour
     }
 
     
-    // ========== PROXIMITY ==========
+    // ========== Interaction ==========
 
     private void ProximityTouchingDetection()
     {

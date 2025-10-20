@@ -1,8 +1,16 @@
 using System;
+using System.Collections.Generic;
 using MoonSharp.Interpreter;
 using UnityEngine;
 using LuaProxies; // keep if your proxies live in this namespace
 
+/// <summary>
+/// Runtime Lua behaviour with lazy, safe-guarded proxy binding.
+/// - Eagerly binds gameObject & transform.
+/// - Lazily exposes self.rigidbody, self.audio, self.particles, self.animator, self.collider, etc.
+///   If missing, adds a safe default where sensible (see EnsureComponent<T>() usage).
+/// - start(self), update(self, dt), on_trigger(self, other), on_collision(self, col), on_stop(self) supported.
+/// </summary>
 [DisallowMultipleComponent]
 public class LuaBehaviour : MonoBehaviour
 {
@@ -12,11 +20,22 @@ public class LuaBehaviour : MonoBehaviour
     public bool runOnStart = true;
 
     [Header("Run Control")]
-    [Tooltip("If false, update() will not call into Lua. Use StartRun()/StopRun()/ToggleRun().")]
+    [Tooltip("If false, Update() will not call into Lua. Use StartRun()/StopRun()/ToggleRun().")]
     public bool runEnabled = true;
 
     [Tooltip("When stopping, snap back to the position captured at the moment the script began running.")]
     public bool resetPositionOnStop = true;
+
+    [Header("Auto-Add Defaults (used by lazy proxy binding)")]
+    public bool addRigidbodyIfMissing = true;
+    public bool rbKinematicDefault = true;
+    public bool rbUseGravityDefault = false;
+    public float rbMassDefault = 1f;
+
+    public bool addAudioSourceIfMissing = true;
+    public bool addParticleSystemIfMissing = true;
+    public bool addAnimatorIfMissing = false; // harmless but often unnecessary
+    public bool addBoxColliderIfMissing = false; // collider shapes matter; default off
 
     [Header("Current Lua (preview)")]
     [SerializeField, TextArea(6, 30)] private string _currentLuaPreview;
@@ -31,6 +50,9 @@ public class LuaBehaviour : MonoBehaviour
     private bool _hasRunStartPose;
     private Vector3 _runStartPosition;
 
+    // Cache of bound proxies by key (e.g., "rigidbody","audio",...)
+    private readonly Dictionary<string, DynValue> _proxyCache = new Dictionary<string, DynValue>();
+
     void Awake()
     {
         // Safe: okay to call multiple times; registers all public userdata types in loaded assemblies.
@@ -44,12 +66,28 @@ public class LuaBehaviour : MonoBehaviour
 
         if (!string.IsNullOrEmpty(src))
         {
-            // Compile and bind, but do not auto-start yet; we’ll control start below
-            LoadScript(src, callStart: false);
-
-            if (runOnStart)
-                StartRun();
+            LoadScript(src, callStart: runOnStart);
         }
+    }
+
+    public void StartRun()
+    {
+        runEnabled = true;
+        CaptureRunStartPose();
+        SafeCall(_fnStart);
+    }
+
+    public void StopRun()
+    {
+        runEnabled = false;
+        SafeCall(_fnOnStopOptional);
+        if (resetPositionOnStop) ResetToRunStartPosition();
+    }
+
+    public void ToggleRun()
+    {
+        if (runEnabled) StopRun();
+        else StartRun();
     }
 
     void Update()
@@ -67,12 +105,6 @@ public class LuaBehaviour : MonoBehaviour
                 Debug.LogError($"[Lua] update() error on '{name}': {ex.DecoratedMessage}");
             }
         }
-    }
-
-    public void Trigger()
-    {
-        if (!runEnabled) return;
-        SafeCall(_fnOnTrigger);
     }
 
     void OnTriggerEnter(Collider other)
@@ -115,71 +147,17 @@ public class LuaBehaviour : MonoBehaviour
     {
         if (string.IsNullOrEmpty(luaText))
         {
-            Debug.LogWarning($"[Lua] Empty script on {name}");
+            Debug.LogWarning($"[Lua] Empty script on '{name}'.");
             return;
         }
 
-        _currentLuaPreview = luaText ?? string.Empty;
+        CompileBind(luaText);
 
-        try
+        if (callStart)
         {
-            CompileBind(luaText);
-
-            if (callStart)
-            {
-                // ensure we’re in a running state
-                runEnabled = true;
-                CaptureRunStartPose();
-                SafeCall(_fnStart);
-            }
-        }
-        catch (SyntaxErrorException ex)
-        {
-            Debug.LogError($"[Lua] Syntax error on '{name}': {ex.DecoratedMessage}");
-            _fnStart = _fnUpdate = _fnOnCollision = _fnOnTrigger = _fnOnStopOptional = null;
-        }
-        catch (ScriptRuntimeException ex)
-        {
-            Debug.LogError($"[Lua] Runtime error on '{name}': {ex.DecoratedMessage}");
-            _fnStart = _fnUpdate = _fnOnCollision = _fnOnTrigger = _fnOnStopOptional = null;
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"[Lua] General error on '{name}': {ex.Message}");
-            _fnStart = _fnUpdate = _fnOnCollision = _fnOnTrigger = _fnOnStopOptional = null;
+            StartRun();
         }
     }
-
-    // ===== Run control API =====
-
-    /// <summary>Enable/disable running. When turning on, captures the run-start position and calls Lua start(). When turning off, snaps back to the captured position.</summary>
-    public void SetRunning(bool on)
-    {
-        if (on)
-        {
-            if (!runEnabled)
-            {
-                runEnabled = true;
-                CaptureRunStartPose();
-                SafeCall(_fnStart);
-            }
-        }
-        else
-        {
-            if (runEnabled)
-            {
-                runEnabled = false;
-                // optional user hook
-                SafeCall(_fnOnStopOptional);
-                if (resetPositionOnStop && _hasRunStartPose)
-                    transform.position = _runStartPosition;
-            }
-        }
-    }
-
-    public void StartRun() => SetRunning(true);
-    public void StopRun()  => SetRunning(false);
-    public void ToggleRun() => SetRunning(!runEnabled);
 
     public void ResetToRunStartPosition()
     {
@@ -206,37 +184,121 @@ public class LuaBehaviour : MonoBehaviour
         UserData.RegisterType<ButtonProxy>();
         UserData.RegisterType<CollisionProxy>();
         UserData.RegisterType<LuaDOTween>();
+        UserData.RegisterType<ProgramableObjectProxy>();
+
+
+        //------extra safty
+        UserData.RegisterType<Vector3>();
+
 
         // Globals: helpers + DOTween bridge
         _script.Globals["dotween"] = new LuaDOTween();
         _script.Globals["log"] = (Action<string>)((s) => Debug.Log($"[Lua] {s}"));
         _script.Globals["warn"] = (Action<string>)((s) => Debug.LogWarning($"[Lua] {s}"));
         _script.Globals["error"] = (Action<string>)((s) => Debug.LogError($"[Lua] {s}"));
-        _script.Globals["time_seconds"] = (Func<double>)(() => (double)Time.timeAsDouble);
-        _script.Globals["find_go"] = (Func<string, GameObjectProxy>)(name =>
+
+        // Create self table with lazy __index to auto-bind proxies on demand
+        _self = new Table(_script);
+        var mt = new Table(_script);
+        mt.Set("__index", DynValue.NewCallback((ctx, args) =>
         {
-            var go = GameObject.Find(name);
-            return go ? new GameObjectProxy(go) : null;
-        });
+            // args[0] = table, args[1] = key
+            var key = args[1].CastToString();
+            if (string.IsNullOrEmpty(key)) return DynValue.Nil;
 
-        // Build 'self' table with proxies for THIS GameObject
-        _self = DynValue.NewTable(_script).Table;
+            // Serve cache first
+            if (_proxyCache.TryGetValue(key, out var cached))
+                return cached;
 
-        var goProxy = new GameObjectProxy(gameObject);
-        _self["gameObject"] = UserData.Create(goProxy);
-        _self["transform"]  = UserData.Create(goProxy.GetTransformProxy());
+            DynValue bound = DynValue.Nil;
 
-        var rbProxy = goProxy.GetRigidbodyProxy();           if (rbProxy != null)       _self["rigidbody"] = UserData.Create(rbProxy);
-        var psProxy = goProxy.GetParticleSystemProxy();      if (psProxy != null)       _self["particle"]  = UserData.Create(psProxy);
-        var audioProxy = goProxy.GetAudioSourceProxy();      if (audioProxy != null)    _self["audio"]     = UserData.Create(audioProxy);
-        var animatorProxy = goProxy.GetAnimatorProxy();      if (animatorProxy != null) _self["animator"]  = UserData.Create(animatorProxy);
+            switch (key)
+            {
+                case "gameObject":
+                    bound = UserData.Create(new GameObjectProxy(gameObject));
+                    break;
+                case "transform":
+                    bound = UserData.Create(new TransformProxy(transform));
+                    break;
+                case "rigidbody":
+                {
+                    var rb = EnsureRigidbody();
+                    if (rb != null) bound = UserData.Create(new RigidbodyProxy(rb));
+                    break;
+                }
+                case "audio":
+                case "audioSource":
+                {
+                    var au = EnsureComponent<AudioSource>(addIfMissing: addAudioSourceIfMissing, afterAdd: a => {
+                        a.playOnAwake = false;
+                    });
+                    if (au != null) bound = UserData.Create(new AudioSourceProxy(au));
+                    break;
+                }
+                case "particles":
+                case "particleSystem":
+                {
+                    var ps = EnsureComponent<ParticleSystem>(addIfMissing: addParticleSystemIfMissing, afterAdd: p => {
+                        var main = p.main; main.loop = false; // reasonable default
+                        p.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                    });
+                    if (ps != null) bound = UserData.Create(new ParticleSystemProxy(ps));
+                    break;
+                }
+                case "animator":
+                {
+                    var an = EnsureComponent<Animator>(addIfMissing: addAnimatorIfMissing);
+                    if (an != null) bound = UserData.Create(new AnimatorProxy(an));
+                    break;
+                }
+                case "collider":
+                {
+                    // Only add if explicitly enabled; default off because shape matters.
+                    var col = GetComponent<Collider>();
+                    if (col == null && addBoxColliderIfMissing) col = gameObject.AddComponent<BoxCollider>();
+                    if (col != null) bound = UserData.Create(new GameObjectProxy(col.gameObject)); // or ColliderProxy if you have one
+                    break;
+                }
+                // UI/Text/Button are "resolve-only" by default (no auto-adds)
+                case "text":
+                {
+                    var txt = GetComponentInChildren<UnityEngine.UI.Text>();
+                    if (txt != null) bound = UserData.Create(new TextProxy(txt));
+                    break;
+                }
+                case "button":
+                    {
+                        var btn = GetComponentInChildren<UnityEngine.UI.Button>();
+                        if (btn != null) bound = UserData.Create(new ButtonProxy(btn));
+                        break;
+                    }
+                case "programable":
+                case "programmable":
+                case "programableObject":
+                {
+    var po = GetComponent<ProgramableObject>();   // same GO as LuaBehaviour
+    if (po != null)
+        bound = UserData.Create(new ProgramableObjectProxy(po));
+    break;
+}
 
-        _script.Globals["self"] = _self;
+            }
 
-        // Compile & run chunk (defines start/update/etc.)
-        _script.DoString(src ?? string.Empty);
+            if (bound.IsNotNil())
+                _proxyCache[key] = bound; // cache for future lookups
 
-        // Cache functions
+            return bound; // Nil if not bound; Lua can check 'if self.rigidbody then ... end'
+        }));
+        _self.MetaTable = mt;
+
+        // Optionally eager-bind must-haves:
+        _self["gameObject"] = UserData.Create(new GameObjectProxy(gameObject));
+        _self["transform"]  = UserData.Create(new TransformProxy(transform));
+
+        // Load source
+        _script.DoString(src);
+
+        // Cache function handles if present
         _fnStart       = _script.Globals.Get("start");
         _fnUpdate      = _script.Globals.Get("update");
         _fnOnTrigger   = _script.Globals.Get("on_trigger");
@@ -265,4 +327,47 @@ public class LuaBehaviour : MonoBehaviour
             Debug.LogError($"[Lua] Error on '{name}': {msg}");
         }
     }
+
+    // ===== Ensure helpers =====
+
+    /// <summary>
+    /// Ensures there's a Rigidbody. If missing and allowed, adds one with safe defaults,
+    /// then returns it. Also updates cache entry for 'rigidbody' if already requested.
+    /// </summary>
+    public Rigidbody EnsureRigidbody()
+    {
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb == null && addRigidbodyIfMissing)
+        {
+            rb = gameObject.AddComponent<Rigidbody>();
+            rb.isKinematic = rbKinematicDefault;
+            rb.useGravity  = rbUseGravityDefault;
+            rb.mass        = rbMassDefault;
+        }
+        return rb;
+    }
+
+    /// <summary>
+    /// Generic ensure for other components.
+    /// </summary>
+    private T EnsureComponent<T>(bool addIfMissing, Action<T> afterAdd = null) where T : Component
+    {
+        var c = GetComponent<T>();
+        if (c == null && addIfMissing)
+        {
+            c = gameObject.AddComponent<T>();
+            afterAdd?.Invoke(c);
+        }
+        return c;
+    }
 }
+
+static class DynValueExtensions
+{
+    public static bool IsNotNil(this DynValue dv)
+        => dv != null && dv.Type != DataType.Nil && dv.Type != DataType.Void;
+}
+
+
+
+

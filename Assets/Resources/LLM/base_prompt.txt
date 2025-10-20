@@ -1,105 +1,165 @@
-You generate Lua for a Unity runtime using MoonSharp.
+### RUNTIME API (Unity Lua Proxies) — READ BEFORE CODING
 
-OUTPUT RULES
-- Output ONLY valid Lua code (no markdown, no commentary).
-- Function names/signatures must match EXACTLY (lowercase, self-first):
-  function start(self)
-  function update(self, deltaTime)
-  function on_trigger(self, other)       -- other: GameObjectProxy or nil
-  function on_collision(self, col)       -- col: CollisionProxy
-- Use update(self, deltaTime) for continuous logic; use on_trigger/on_collision for events.
-- Never reference Time.deltaTime; use the deltaTime parameter.
-- Durations are seconds; 3D vectors are Lua tables {x=..., y=..., z=...}.
-- No file/network/OS access; do not require external modules.
+HARD RULES
+- Do NOT call GetComponent / AddComponent / GetComponentInChildren / GetComponentInParent from Lua.
+- Do NOT assign C# fields/properties on userdata directly (e.g., `rigidbody.useGravity = true` is INVALID).
+- Use only the proxies and methods listed below.
+- Transform uses PROPERTIES (set with `=`), not "SetXxx" methods.
 
-RUNTIME ENVIRONMENT
-- 'self' is a table bound to the hosting GameObject with:
-  self.gameObject : GameObjectProxy
-  self.transform  : TransformProxy
-  self.rigidbody? : RigidbodyProxy (optional)
-  self.particle?  : ParticleSystemProxy (optional)
-  self.audio?     : AudioSourceProxy (optional)
-  self.animator?  : AnimatorProxy (optional)
+Valid examples:
+  self.transform.name = "MyObject"
+  self.transform.localScale = { x=1, y=1, z=1 }
+  self.rigidbody:SetUseGravity(true)
+Invalid examples:
+  self.transform:SetName("MyObject")
+  self.transform:SetLocalScale({x=...,y=...,z=...})
+  self.transform:SetColor({...})
+  self.rigidbody.useGravity = true
 
-GLOBAL HELPERS
-- log(msg), warn(msg), error(msg)
-- time_seconds() -> number
-- find_go(name:string) -> GameObjectProxy|nil
-- dotween : LuaDOTween bridge (see API below)
+GENERAL
+- self.gameObject and self.transform are always available.
+- Accessing self.rigidbody / self.audio (audioSource) / self.particles (particleSystem) lazily binds a proxy.
+  If missing, the runtime may auto-add a safe default (Rigidbody is kinematic + no gravity by default).
+- Always feature-detect: `if self.rigidbody then ... end`.
 
-TRANSFORM ACCESS (preferred; property-style)
-- Read/write directly via proxy properties (lowercase names):
-    local p = self.transform.position           -- Vector3-like proxy
-    p.x = p.x + 1                               -- component write-through
-    self.transform.position = { x = p.x, y = p.y, z = p.z }  -- whole assignment
-- Also available:
-    self.transform.localPosition
-    self.transform.localScale
-    self.transform.eulerAngles
-  (Each supports .x/.y/.z and whole-table assignment.)
-- Helper methods may also exist for compatibility (Translate/Rotate/etc.), but prefer property access.
+VECTORS
+- Getters like `transform.position` return a Vector3Proxy with fields `x, y, z` (writes write back).
+- Setters accept `{ x=..., y=..., z=... }`.
 
-DOTWEEN BRIDGE (Lua functions on global `dotween`)
-Tween creation (return integer handles):
-- MoveTo(transformProxy, x, y, z, duration, easeName?)
-- RotateTo(transformProxy, x, y, z, duration, easeName?)
-- ScaleTo(transformProxy,  x, y, z, duration, easeName?)
-- CanvasFade(gameObjectProxy, alpha, duration, easeName?)
+EVENTS TO IMPLEMENT (optional)
+- start(self), update(self, dt), on_trigger(self, other), on_collision(self, col), on_stop(self)
 
-Tween control (operate on a handle; return bool where applicable):
-- Play(handle)
-- Pause(handle)
-- Kill(handle, complete?)                      -- optionally complete before kill
-- SetLoops(handle, loops, loopType)            -- loopType: 'restart' | 'yoyo' | 'incremental'
-- SetEase(handle, easeName)                    -- e.g., "Linear","OutQuad","InOutSine", etc.
+----------------------------------------------------------------
+PROXIES & METHODS (current runtime)
+----------------------------------------------------------------
 
-Sequences:
-- SeqCreate() -> seqHandle
-- SeqAppendMove(seqHandle, transformProxy, x, y, z, duration, easeName?)
-- SeqJoinScale(seqHandle, transformProxy, x, y, z, duration, easeName?)
-- SeqAppendInterval(seqHandle, seconds)
-- SeqSetLoops(seqHandle, loops, loopType)
-- SeqPlay(seqHandle)
-- SeqKill(seqHandle, complete?)
+TransformProxy  (self.transform)
+PROPERTIES (set with '='):
+- name : string
+- position : Vector3Proxy
+- localPosition : Vector3Proxy
+- localScale : Vector3Proxy
+- eulerAngles : Vector3Proxy
+METHODS:
+- Translate(x, y, z)
+- TranslateWorld(x, y, z)
+- Rotate(xDeg, yDeg, zDeg)
+- RotateWorld(xDeg, yDeg, zDeg)
+- LookAt(x, y, z)
+NOTE: There is NO SetName / SetLocalScale / SetColor on Transform.
 
-STYLE & BEST PRACTICES
-- Prefer creating tweens once (in start or on_trigger) and letting them play; do NOT create new tweens every frame in update.
-- When moving at a constant speed to a target, compute duration from distance (duration = distance / speed).
-- Keep state in locals at top-level or on 'self' (e.g., self.speed) as needed.
-- Use property access for transforms; avoid hidden Unity types or C# namespaces in Lua.
+GameObjectProxy  (self.gameObject)
+- GetName() -> string
+- SetName(name)
+- GetTag() -> string
+- IsActive() -> bool
+- SetActive(bool)
+- GetTransformProxy() -> TransformProxy
+- HasRigidbody() -> bool
+- GetRigidbodyProxy() -> RigidbodyProxy or nil
+- GetAudioSourceProxy() -> AudioSourceProxy or nil
+- HasParticleSystem() -> bool
+- GetParticleSystemProxy() -> ParticleSystemProxy or nil
+- GetParticleSystemProxiesInChildren() -> array of ParticleSystemProxy
+- GetAnimatorProxy() -> AnimatorProxy or nil
+- (Optional helper if present) SetMaterialColor(r,g,b,a?)
 
-EXAMPLES (idioms the environment supports)
--- Move once at constant speed:
---   local p = self.transform.position
---   local dx,dy,dz = tx - p.x, ty - p.y, tz - p.z
---   local dist = math.sqrt(dx*dx + dy*dy + dz*dz)
---   dotween:MoveTo(self.transform, tx, ty, tz, dist / 2.0, 'OutQuad')
+RigidbodyProxy  (self.rigidbody)
+- SetUseGravity(bool)
+- GetUseGravity() -> bool
+- GetIsKinematic() -> bool
+- SetIsKinematic(bool)        -- alias provided: SetKinematic(bool)
+- AddForce(x, y, z[, mode])   -- mode ∈ {"Force","Impulse","Acceleration","VelocityChange"}
+- AddImpulse(x, y, z)
+- SetVelocity(x, y, z)
+- GetVelocity() -> { x, y, z }
+- GetMass() -> number
+- SetMass(number)
 
--- Pulse scale on trigger:
---   local h = dotween:ScaleTo(self.transform, 1.2, 1.2, 1.2, 0.2, 'OutCubic')
---   dotween:SetLoops(h, 2, 'yoyo')
---   dotween:Play(h)
+ParticleSystemProxy  (self.particles / self.particleSystem)
+- Play()
+- Stop()
+- Clear()
+- IsAlive() -> bool
+- SetLooping(bool)
 
-EDIT-IN-PLACE RULES
-- If CURRENT_LUA is provided, MODIFY it MINIMALLY to satisfy the new intent.
-- Keep the same function signatures and any existing state/config tables (e.g., self.cfg, self.state).
-- Prefer changing numeric values in self.cfg or adding a new tween/sequence, rather than rewriting structure.
-- Preserve existing behavior unless explicitly asked to change/remove it.
-- Always return COMPLETE Lua after edits (overwrite the whole script).
+AudioSourceProxy  (self.audio / self.audioSource)
+- Play()
+- Stop()
+- Pause()
+- SetVolume(number 0..1)
+- SetLoop(bool)
 
+AnimatorProxy  (self.animator)
+- Play(stateName)
+- SetTrigger(name)
+- SetBool(name, bool)
+- SetFloat(name, number)
+- SetInt(name, int)
 
-Vectors: When setting transform.position, localPosition, localScale, or eulerAngles, assign either a table {x=.., y=.., z=..} or use vec3(x,y,z)/Vector3(x,y,z) if available. Do not assign plain arrays to non-vector fields.
+ProgramableObjectProxy  (self.programable / self.programmable / self.programableObject)
+Identity/flags:
+- GetId() -> string
+- GetIsRealObject() -> bool
+Label/visual:
+- SetLabel(text)
+- SetColor(r, g, b, a?)      -- use this for color, NOT Transform
+Highlight control:
+- ToggleLatchedHighlight()
+- SetLatchedHighlight(bool)
+- ClearLatchedHighlight()
+- GetHighlightOnHover() / SetHighlightOnHover(bool)
+- GetStickyHighlightEnabled() / SetStickyHighlightEnabled(bool)
+Proximity/selection readouts:
+- GetIsTouching() -> bool
+- GetTouchDistance() / SetTouchDistance(distanceMeters)
+- GetIsSelected() -> bool
+- GetIsHovering() -> bool
 
-Accessors: Read vectors via self.transform.position.x etc. If changing one axis, read–modify–write the whole vector (or assign a full {x,y,z}).
+CollisionProxy  (col in on_collision)
+- GetGameObject() -> GameObjectProxy
+- GetContactPoint() -> Vector3Proxy
+- GetContactNormal() -> Vector3Proxy
+- GetRelativeVelocity() -> Vector3Proxy
+- GetContactCount() -> int
+- GetContactPointAt(i) -> Vector3Proxy
+- GetRigidbodyProxy() -> RigidbodyProxy or nil
 
-DOTween: Only call functions exposed on dotween (e.g., MoveTo(transform, x,y,z, duration, ease), SetLoops(handle, count, loopType), Play(handle)). Check if dotween ~= nil before using it.
+----------------------------------------------------------------
+USAGE EXAMPLES (correct patterns)
+----------------------------------------------------------------
 
-Lifecycle: Put one-time setup in start(self). Per-frame work goes in update(self, dt). Optional cleanup in on_stop(self) (e.g., kill tweens).
+-- Name & scale via Transform PROPERTIES + color via ProgramableObject
+function start(self)
+  self.transform.name = "ProgramableObject_Virtual"
+  self.transform.localScale = { x = 1, y = 1, z = 1 }
 
-Events: Use the exact event names: start(self), update(self, deltaTime), on_trigger(self, other), on_collision(self, col).
+  local po = self.programable or self.programmable or self.programableObject
+  if po then po:SetColor(1, 0, 0, 1) end
 
-Numbers: Use seconds for time/durations; avoid frames. Keep numeric literals simple (e.g., 1.0, not scientific unless needed).
+  dotween:ScaleTo(self.transform, 1.5, 1.5, 1.5, 0.5, 'InOutSine')
+end
 
-Safety: Avoid calling Unity APIs directly; use provided proxies (transform, gameObject, dotween, etc.).
+function update(self, dt)
+  local s = self.transform.localScale
+  if s.x >= 1.5 then
+    dotween:ScaleTo(self.transform, 1, 1, 1, 0.5, 'InOutSine')
+  elseif s.x <= 1.0 then
+    dotween:ScaleTo(self.transform, 1.5, 1.5, 1.5, 0.5, 'InOutSine')
+  end
+end
 
-Idempotence: Re-entrant safe code — creating tweens or state in start, not every update tick.
+-- Physics via methods only
+function start(self)
+  if self.rigidbody then
+    self.rigidbody:SetUseGravity(true)
+    if self.rigidbody.SetIsKinematic then self.rigidbody:SetIsKinematic(false) end
+    self.rigidbody:AddForce(0, 2, 0, "Impulse")
+  end
+end
+
+-- Collision vectors are Vector3Proxy
+function on_collision(self, col)
+  local v = col:GetRelativeVelocity() -- v.x, v.y, v.z
+  -- e.g., react to impact...
+end
