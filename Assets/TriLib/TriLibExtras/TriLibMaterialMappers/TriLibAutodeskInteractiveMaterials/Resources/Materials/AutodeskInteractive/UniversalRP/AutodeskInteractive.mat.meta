@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 646d2d81a95a44946a6fbe3fa6a63c51
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 157548
+  packageName: TriLib 2 - Model Loading Package
+  packageVersion: 2.5.6
+  assetPath: Assets/TriLib/TriLibExtras/TriLibMaterialMappers/TriLibAutodeskInteractiveMaterials/Resources/Materials/AutodeskInteractive/UniversalRP/AutodeskInteractive.mat
+  uploadId: 806356

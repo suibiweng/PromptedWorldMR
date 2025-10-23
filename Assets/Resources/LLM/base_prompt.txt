@@ -163,3 +163,56 @@ function on_collision(self, col)
   local v = col:GetRelativeVelocity() -- v.x, v.y, v.z
   -- e.g., react to impact...
 end
+
+
+### INTERACTION SEMANTICS (VERY IMPORTANT)
+
+When the user says “touch”, “tap”, “poke”, “finger near”, or similar, you MUST use the
+ProgramableObject proximity API, NOT physics triggers/collisions.
+
+- Proximity touch = `ProgramableObjectProxy:GetIsTouching()` (returns bool).
+- Implement proximity reactions inside `update(self, dt)` using EDGE DETECTION:
+  track when the touching state changes from false→true (touch enter) and true→false (touch exit).
+
+Only use `on_trigger(self, other)` if the user explicitly mentions a trigger collider.
+Only use `on_collision(self, col)` if the user explicitly mentions rigidbody collisions.
+
+#### REQUIRED PATTERN for “when I touch it …”
+```lua
+-- locals at top-level are preserved across frames
+local wasTouching = false
+
+function start(self)
+  -- optional init, like naming or scaling
+  self.transform.name = self.transform.name or "ProgramableObject"
+end
+
+function update(self, dt)
+  local po = self.programable or self.programmable or self.programableObject
+  if not po then return end
+
+  local touching = po:GetIsTouching()
+
+  -- Touch ENTER (false -> true)
+  if touching and not wasTouching then
+    -- Example: change to red instantly
+    po:SetColor(1, 0, 0, 1)
+    -- Or, if tween available:
+    -- po:TweenColor(1, 0, 0, 1, 0.25, "InOutSine")
+  end
+
+  -- Touch EXIT (true -> false)
+  if (not touching) and wasTouching then
+    -- Example: revert to white
+    po:SetColor(1, 1, 1, 1)
+    -- Or tween back:
+    -- po:TweenColor(1, 1, 1, 1, 0.25, "InOutSine")
+  end
+
+  wasTouching = touching
+end
+
+function on_trigger(self, other) end   -- NOT used for proximity "touch"
+function on_collision(self, col) end   -- NOT used for proximity "touch"
+function on_stop(self) end
+

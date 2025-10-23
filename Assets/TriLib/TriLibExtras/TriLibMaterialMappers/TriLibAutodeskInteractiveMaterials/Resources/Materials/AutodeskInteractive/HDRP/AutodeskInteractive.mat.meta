@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 6e58d2a47b548c3469c8456ebd73b518
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 157548
+  packageName: TriLib 2 - Model Loading Package
+  packageVersion: 2.5.6
+  assetPath: Assets/TriLib/TriLibExtras/TriLibMaterialMappers/TriLibAutodeskInteractiveMaterials/Resources/Materials/AutodeskInteractive/HDRP/AutodeskInteractive.mat
+  uploadId: 806356

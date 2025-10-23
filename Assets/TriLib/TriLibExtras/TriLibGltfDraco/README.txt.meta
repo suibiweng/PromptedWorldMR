@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: b3e7e872731b08e45a59b4323d27a500
+TextScriptImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 157548
+  packageName: TriLib 2 - Model Loading Package
+  packageVersion: 2.5.6
+  assetPath: Assets/TriLib/TriLibExtras/TriLibGltfDraco/README.txt
+  uploadId: 806356

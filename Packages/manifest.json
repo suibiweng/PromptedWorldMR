@@ -2,6 +2,7 @@
   "dependencies": {
     "com.meta.xr.depthapi": "https://github.com/oculus-samples/Unity-DepthAPI.git?path=/Packages/com.meta.xr.depthapi",
     "com.meta.xr.sdk.all": "78.0.0",
+    "com.unity.2d.sprite": "1.0.0",
     "com.unity.collab-proxy": "2.9.3",
     "com.unity.feature.development": "1.0.2",
     "com.unity.multiplayer.center": "1.0.0",

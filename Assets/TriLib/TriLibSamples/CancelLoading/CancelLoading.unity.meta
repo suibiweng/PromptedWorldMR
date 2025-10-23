@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 8d306b68cfef12a4eaae08b2712398b5
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 157548
+  packageName: TriLib 2 - Model Loading Package
+  packageVersion: 2.5.6
+  assetPath: Assets/TriLib/TriLibSamples/CancelLoading/CancelLoading.unity
+  uploadId: 806356

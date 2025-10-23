@@ -11,6 +11,7 @@ using UnityEngine.Networking;
 /// - Loads API key from Resources/Secrets/openai_api_key.txt
 /// - Supports prompt-based image generation and image editing
 /// - Returns Texture2D or saves PNG to disk
+/// - Reports elapsed seconds via optional callback
 /// </summary>
 public class OpenAIImageService : MonoBehaviour
 {
@@ -24,7 +25,12 @@ public class OpenAIImageService : MonoBehaviour
 
     private const string ImageModel = "gpt-image-1";
     private const string UrlGenerations = "https://api.openai.com/v1/images/generations";
-    private const string UrlEdits = "https://api.openai.com/v1/images/edits";
+    private const string UrlEdits       = "https://api.openai.com/v1/images/edits";
+
+    private static readonly HashSet<string> AllowedSizes = new HashSet<string>
+    {
+        "1024x1024", "1024x1536", "1536x1024", "auto"
+    };
 
     private void Awake()
     {
@@ -62,7 +68,7 @@ public class OpenAIImageService : MonoBehaviour
             if (!string.IsNullOrEmpty(fromEnv))
                 return fromEnv;
         }
-        catch { }
+        catch { /* ignore */ }
 
         var ta = Resources.Load<TextAsset>("Secrets/openai_api_key");
         if (ta != null)
@@ -78,10 +84,20 @@ public class OpenAIImageService : MonoBehaviour
         return ta.text?.Trim();
     }
 
+    private static string NormalizeSize(string size)
+    {
+        if (string.IsNullOrWhiteSpace(size)) return "1024x1024";
+        var s = size.Trim().ToLowerInvariant();
+        var space = s.IndexOf(' ');
+        if (space > 0) s = s.Substring(0, space);
+        return AllowedSizes.Contains(s) ? s : "1024x1024";
+    }
+
     // ------------------------------------------------------------
     // PUBLIC METHODS
     // ------------------------------------------------------------
 
+    /// <param name="onElapsedSeconds">Optional callback with total seconds from request start -> successful decode.</param>
     public static IEnumerator GenerateFromPrompt(
         string prompt,
         string size = "1024x1024",
@@ -89,7 +105,8 @@ public class OpenAIImageService : MonoBehaviour
         Action<Texture2D> onDone = null,
         Action<string> onError = null,
         bool savePng = false,
-        string savePath = null)
+        string savePath = null,
+        Action<float> onElapsedSeconds = null)
     {
         if (string.IsNullOrWhiteSpace(prompt))
         {
@@ -104,16 +121,19 @@ public class OpenAIImageService : MonoBehaviour
             yield break;
         }
 
+        size = NormalizeSize(size);
+
         var reqBody = new ImageGenerationRequest
         {
             model = ImageModel,
             prompt = prompt,
             size = size,
-            quality = quality,
-            response_format = "b64_json"
+            quality = quality
         };
 
         byte[] bodyRaw = Encoding.UTF8.GetBytes(JsonUtility.ToJson(reqBody));
+
+        float t0 = Time.realtimeSinceStartup;
 
         using (var www = new UnityWebRequest(UrlGenerations, "POST"))
         {
@@ -163,9 +183,13 @@ public class OpenAIImageService : MonoBehaviour
                 SavePng(tex, savePath ?? "openai_gen_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png");
 
             onDone?.Invoke(tex);
+
+            float elapsed = Time.realtimeSinceStartup - t0;
+            onElapsedSeconds?.Invoke(elapsed);
         }
     }
 
+    /// <param name="onElapsedSeconds">Optional callback with total seconds from request start -> successful decode.</param>
     public static IEnumerator EditImage(
         Texture2D sourceTexture,
         Texture2D maskTexture,
@@ -175,7 +199,8 @@ public class OpenAIImageService : MonoBehaviour
         Action<Texture2D> onDone = null,
         Action<string> onError = null,
         bool savePng = false,
-        string savePath = null)
+        string savePath = null,
+        Action<float> onElapsedSeconds = null)
     {
         if (sourceTexture == null)
         {
@@ -190,13 +215,14 @@ public class OpenAIImageService : MonoBehaviour
             yield break;
         }
 
+        size = NormalizeSize(size);
+
         var form = new List<IMultipartFormSection>
         {
             new MultipartFormDataSection("model", ImageModel),
             new MultipartFormDataSection("prompt", prompt),
             new MultipartFormDataSection("size", size),
-            new MultipartFormDataSection("quality", quality),
-            new MultipartFormDataSection("response_format", "b64_json")
+            new MultipartFormDataSection("quality", quality)
         };
 
         byte[] imageBytes = sourceTexture.EncodeToPNG();
@@ -207,6 +233,8 @@ public class OpenAIImageService : MonoBehaviour
             byte[] maskBytes = maskTexture.EncodeToPNG();
             form.Add(new MultipartFormFileSection("mask", maskBytes, "mask.png", "image/png"));
         }
+
+        float t0 = Time.realtimeSinceStartup;
 
         using (var www = UnityWebRequest.Post(UrlEdits, form))
         {
@@ -253,6 +281,9 @@ public class OpenAIImageService : MonoBehaviour
                 SavePng(tex, savePath ?? "openai_edit_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png");
 
             onDone?.Invoke(tex);
+
+            float elapsed = Time.realtimeSinceStartup - t0;
+            onElapsedSeconds?.Invoke(elapsed);
         }
     }
 
@@ -297,7 +328,6 @@ public class OpenAIImageService : MonoBehaviour
         public string prompt;
         public string size;
         public string quality;
-        public string response_format;
     }
 
     [Serializable]

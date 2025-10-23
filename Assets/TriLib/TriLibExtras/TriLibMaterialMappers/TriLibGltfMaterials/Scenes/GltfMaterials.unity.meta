@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 37be5a2c615e89a40a4a54671b209451
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 157548
+  packageName: TriLib 2 - Model Loading Package
+  packageVersion: 2.5.6
+  assetPath: Assets/TriLib/TriLibExtras/TriLibMaterialMappers/TriLibGltfMaterials/Scenes/GltfMaterials.unity
+  uploadId: 806356

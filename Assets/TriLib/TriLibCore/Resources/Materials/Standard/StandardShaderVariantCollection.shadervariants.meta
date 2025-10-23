@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 4e605f9193fbf224aa3a74fae17b5fe9
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 20000000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 157548
+  packageName: TriLib 2 - Model Loading Package
+  packageVersion: 2.5.6
+  assetPath: Assets/TriLib/TriLibCore/Resources/Materials/Standard/StandardShaderVariantCollection.shadervariants
+  uploadId: 806356

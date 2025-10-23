@@ -1,0 +1,13 @@
+﻿2.5.6
+Changelog:
+-Added the "CancelLoading" sample scene, demonstrating how to properly cancel a loading request.
+-Added a new "Customizable" Material Mapper. The default material mappers now inherit from this customizable mapper.
+-Added Maya Mental Ray material support to the FBX importer.
+-Added the linear argument to the HDRLoader.Load method to support linear color space.
+-Fixed a bug causing duplicated materials in DAE files.
+-Fixed a bug causing unassigned materials in glTF2 files.
+-Fixed a bug when loading models from ZIP files without valid models inside.
+-Fixed a regression where TriLib could not find a suitable texture format on some devices.
+-Fixed a bug in the texture alpha pixel scanner where alpha materials were created unnecessarily.
+-Moved TriLib extra content to the "TriLibExtras" folder to make the project structure cleaner.
+-Removed the TriLib settings file and material mapper selection. This feature often caused issues for some users, so now TriLib automatically selects the default material mappers based on the render pipeline.

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 72997b5ef0207744aaf31a8aefec7a91
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 157548
+  packageName: TriLib 2 - Model Loading Package
+  packageVersion: 2.5.6
+  assetPath: Assets/TriLib/TriLibExtras/TriLibMaterialMappers/TriLibGltfMaterials/Resources/Materials/glTF2/Standard/StandardSpecularGLTF2.mat
+  uploadId: 806356

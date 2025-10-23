@@ -6,6 +6,12 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/ArUcoMarkerTracking.unity
+    guid: 42cb89ae9cffec24c8d1e5a4876b74a7
+  - enabled: 1
+    path: Assets/Scenes/RayCastCam.unity
+    guid: f41f49e3f31080c4a9a951457a15c47e
+  - enabled: 1
     path: Assets/Scenes/RayCastSelector.unity
     guid: c1a3f01d87045b047ad6fc948bf425e9
   - enabled: 1

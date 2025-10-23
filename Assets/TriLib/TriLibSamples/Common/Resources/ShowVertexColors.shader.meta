@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: d4c795bd082e5bb43a5e9b0911856932
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  preprocessorOverride: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 157548
+  packageName: TriLib 2 - Model Loading Package
+  packageVersion: 2.5.6
+  assetPath: Assets/TriLib/TriLibSamples/Common/Resources/ShowVertexColors.shader
+  uploadId: 806356
