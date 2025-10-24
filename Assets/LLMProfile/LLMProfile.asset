@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b70cf30e3943d8e4ba8345acbf96713f, type: 3}
+  m_Name: LLMProfile
+  m_EditorClassIdentifier: 
+  provider: openai
+  model: gpt-4.1-mini
+  baseUrl: https://api.openai.com/v1/chat/completions
+  apiKey: 
+  basePromptResourcePath: LLM/Prompted_Matters_base_prompt
+  temperature: 0.4
+  maxTokens: 1400
+  expectStrictJson: 1
