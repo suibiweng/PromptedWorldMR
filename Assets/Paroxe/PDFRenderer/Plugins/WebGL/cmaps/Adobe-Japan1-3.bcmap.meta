@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 45e90d4d3c78ead4394b95f2a512b258
+timeCreated: 1572199982
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/Adobe-Japan1-3.bcmap
+  uploadId: 487316

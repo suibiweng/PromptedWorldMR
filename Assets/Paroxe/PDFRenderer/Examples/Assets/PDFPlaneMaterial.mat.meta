@@ -1,0 +1,13 @@
+fileFormatVersion: 2
+guid: 2df8a6b0019cd6d44b0cefc551deaa8a
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Examples/Assets/PDFPlaneMaterial.mat
+  uploadId: 487316

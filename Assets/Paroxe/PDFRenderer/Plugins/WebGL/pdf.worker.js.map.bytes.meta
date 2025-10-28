@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 75edc47329a41f64c95fd821665d755e
+timeCreated: 1572200010
+licenseType: Store
+TextScriptImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/pdf.worker.js.map.bytes
+  uploadId: 487316

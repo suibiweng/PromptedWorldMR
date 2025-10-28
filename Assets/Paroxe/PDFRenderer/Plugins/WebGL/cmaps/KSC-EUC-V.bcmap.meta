@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: cd2cdd16b8a1ed943a4af026a6a95925
+timeCreated: 1572199984
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/KSC-EUC-V.bcmap
+  uploadId: 487316

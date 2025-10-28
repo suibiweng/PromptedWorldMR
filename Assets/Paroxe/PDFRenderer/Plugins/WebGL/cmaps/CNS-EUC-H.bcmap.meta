@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 53fe4c274aea7c343a07d24ecdc97daa
+timeCreated: 1572199982
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/CNS-EUC-H.bcmap
+  uploadId: 487316

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d8d9373653d417f4c8a827f2d837ef25
+timeCreated: 1572199984
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/ETenms-B5-H.bcmap
+  uploadId: 487316

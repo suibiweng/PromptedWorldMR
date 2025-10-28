@@ -552,92 +552,136 @@ namespace LuaProxies
 
 
     // =========================
-// ProgramableObjectProxy
-// =========================
-[MoonSharpUserData]
-public class ProgramableObjectProxy
-{
-    private readonly ProgramableObject _po;
-
-    public ProgramableObjectProxy(ProgramableObject po)
+    // ProgramableObjectProxy
+    // =========================
+    [MoonSharpUserData]
+    public class ProgramableObjectProxy
     {
-        _po = po;
+        private readonly ProgramableObject _po;
+
+        public ProgramableObjectProxy(ProgramableObject po)
+        {
+            _po = po;
+        }
+
+        // ---- Identity / flags ----
+        public string GetId() => _po != null ? _po.id : "";
+        public bool GetIsRealObject() => _po != null && _po.isRealObject;
+
+        // ---- Label / visuals ----
+        public void SetLabel(string label)
+        {
+            if (_po != null) _po.setLabel(label);
+        }
+
+        // RGBA 0..1
+        public void SetColor(float r, float g, float b, float a = 1f)
+        {
+            if (_po != null) _po.changeColor(new UnityEngine.Color(r, g, b, a));
+        }
+
+        // ---- Highlight controls (sticky latch) ----
+        public void ToggleLatchedHighlight()
+        {
+            if (_po != null) _po.ToggleLatchedHighlight();
+        }
+
+        public void SetLatchedHighlight(bool on)
+        {
+            if (_po != null) _po.SetLatchedHighlight(on);
+        }
+
+        public void ClearLatchedHighlight()
+        {
+            if (_po != null) _po.ClearLatchedHighlight();
+        }
+
+        // Update the current visual state without changing it (forces refresh)
+        public void RefreshHighlight()
+        {
+            if (_po != null) _po.SetLatchedHighlight(_po.highlightLatched);
+        }
+
+        // When true, outline can show on hover (when sticky isn’t used)
+        public bool GetHighlightOnHover() => _po != null && _po.highlightOnHover;
+        public void SetHighlightOnHover(bool enable)
+        {
+            if (_po == null) return;
+            _po.highlightOnHover = enable;
+            // force a visual refresh
+            _po.SetLatchedHighlight(_po.highlightLatched);
+        }
+
+        public bool GetStickyHighlightEnabled() => _po != null && _po.stickyHighlightEnabled;
+        public void SetStickyHighlightEnabled(bool enable)
+        {
+            if (_po == null) return;
+            _po.stickyHighlightEnabled = enable;
+            _po.SetLatchedHighlight(_po.highlightLatched);
+        }
+
+        // ---- Proximity / selection readouts ----
+        public bool GetIsTouching() => _po != null && _po.isToching;
+        public float GetTouchDistance() => _po != null ? _po.Touchingdistance : 0f;
+        public void SetTouchDistance(float d)
+        {
+            if (_po == null) return;
+            _po.Touchingdistance = Mathf.Max(0.001f, d);
+        }
+
+        public bool GetIsSelected() => _po != null && _po._selected;
+        public bool GetIsHovering() => _po != null && _po._hovering;
+
+        // ---- Image (optional; only useful if you pass a Texture via C#) ----
+        public void SetImage(Texture tex)
+        {
+            if (_po != null) _po.setImage(tex);
+        }
     }
 
-    // ---- Identity / flags ----
-    public string GetId() => _po != null ? _po.id : "";
-    public bool GetIsRealObject() => _po != null && _po.isRealObject;
 
-    // ---- Label / visuals ----
-    public void SetLabel(string label)
+  [MoonSharpUserData]
+    public class PromptedMatterProxy
     {
-        if (_po != null) _po.setLabel(label);
+        private readonly PromptedMatter _pm;
+        public PromptedMatterProxy(PromptedMatter pm) { _pm = pm; }
+
+        // Identity-ish helpers
+        public string GetName() => _pm ? _pm.name : "";
+        public string GetHint() => _pm ? _pm.objectHint : "";
+
+        // Color controls
+        public void SetColor(float r, float g, float b, float a = 1f)
+        {
+            if (_pm == null) return;
+            _pm.changeColor(new Color(r, g, b, a));
+        }
+        public void SetColorHex(string hex)
+        {
+            if (_pm == null) return;
+            _pm.changeColorHex(hex);
+        }
+
+        // Proximity touch
+        public bool GetIsTouching() => _pm != null && _pm.isTouching;
+        public float GetTouchDistance() => _pm != null ? _pm.TouchingDistance : 0f;
+        public void SetTouchDistance(float d) { if (_pm == null) return; _pm.TouchingDistance = Mathf.Max(0.001f, d); }
+
+        // Particles (simple controls if present)
+        public bool HasMeshParticles()
+        {
+            return _pm != null && _pm.meshParticleSystem != null;
+        }
+        public void PlayMeshParticles()
+        {
+            if (_pm?.meshParticleSystem != null) _pm.meshParticleSystem.Play(true);
+        }
+        public void StopMeshParticles()
+        {
+            if (_pm?.meshParticleSystem != null) _pm.meshParticleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        }
     }
 
-    // RGBA 0..1
-    public void SetColor(float r, float g, float b, float a = 1f)
-    {
-        if (_po != null) _po.changeColor(new UnityEngine.Color(r, g, b, a));
-    }
-
-    // ---- Highlight controls (sticky latch) ----
-    public void ToggleLatchedHighlight()
-    {
-        if (_po != null) _po.ToggleLatchedHighlight();
-    }
-
-    public void SetLatchedHighlight(bool on)
-    {
-        if (_po != null) _po.SetLatchedHighlight(on);
-    }
-
-    public void ClearLatchedHighlight()
-    {
-        if (_po != null) _po.ClearLatchedHighlight();
-    }
-
-    // Update the current visual state without changing it (forces refresh)
-    public void RefreshHighlight()
-    {
-        if (_po != null) _po.SetLatchedHighlight(_po.highlightLatched);
-    }
-
-    // When true, outline can show on hover (when sticky isn’t used)
-    public bool GetHighlightOnHover() => _po != null && _po.highlightOnHover;
-    public void SetHighlightOnHover(bool enable)
-    {
-        if (_po == null) return;
-        _po.highlightOnHover = enable;
-        // force a visual refresh
-        _po.SetLatchedHighlight(_po.highlightLatched);
-    }
-
-    public bool GetStickyHighlightEnabled() => _po != null && _po.stickyHighlightEnabled;
-    public void SetStickyHighlightEnabled(bool enable)
-    {
-        if (_po == null) return;
-        _po.stickyHighlightEnabled = enable;
-        _po.SetLatchedHighlight(_po.highlightLatched);
-    }
-
-    // ---- Proximity / selection readouts ----
-    public bool GetIsTouching() => _po != null && _po.isToching;
-    public float GetTouchDistance() => _po != null ? _po.Touchingdistance : 0f;
-    public void SetTouchDistance(float d)
-    {
-        if (_po == null) return;
-        _po.Touchingdistance = Mathf.Max(0.001f, d);
-    }
-
-    public bool GetIsSelected() => _po != null && _po._selected;
-    public bool GetIsHovering() => _po != null && _po._hovering;
-
-    // ---- Image (optional; only useful if you pass a Texture via C#) ----
-    public void SetImage(Texture tex)
-    {
-        if (_po != null) _po.setImage(tex);
-    }
-}
 
 }
 

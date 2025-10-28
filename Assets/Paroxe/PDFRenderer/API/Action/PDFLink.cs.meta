@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1f52abc801cf0fc4ca927c58d54a09be
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/API/Action/PDFLink.cs
+  uploadId: 487316

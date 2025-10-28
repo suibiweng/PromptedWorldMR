@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 09879ec8a9f3fd7498510f73490ce2a6
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Internal/Scripts/Viewer/PDFBookmarkListItem.cs
+  uploadId: 487316

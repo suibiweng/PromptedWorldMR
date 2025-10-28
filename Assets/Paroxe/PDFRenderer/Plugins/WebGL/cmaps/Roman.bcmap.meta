@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fc2811a802625474ca35609fb1a4a354
+timeCreated: 1572199984
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/Roman.bcmap
+  uploadId: 487316

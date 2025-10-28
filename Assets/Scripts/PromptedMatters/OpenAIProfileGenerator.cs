@@ -1,6 +1,3 @@
-// OpenAIProfileGenerator.cs
-// Builds prompt, calls LLM, parses JSON, applies to PromptedMatter, and supports "continue editing".
-
 using System;
 using System.Collections;
 using System.Text;
@@ -43,36 +40,15 @@ public class OpenAIProfileGenerator : MonoBehaviour
         public System.Collections.Generic.List<string> values = new();
         private System.Collections.Generic.Dictionary<string, string> _dict = new();
 
-        public void OnBeforeSerialize()
-        {
-            keys.Clear(); values.Clear();
-            foreach (var kv in _dict) { keys.Add(kv.Key); values.Add(kv.Value); }
-        }
-        public void OnAfterDeserialize()
-        {
-            _dict = new();
-            for (int i = 0; i < Math.Min(keys.Count, values.Count); i++)
-                _dict[keys[i]] = values[i];
-        }
+        public void OnBeforeSerialize() { keys.Clear(); values.Clear(); foreach (var kv in _dict) { keys.Add(kv.Key); values.Add(kv.Value); } }
+        public void OnAfterDeserialize() { _dict = new(); for (int i = 0; i < Math.Min(keys.Count, values.Count); i++) _dict[keys[i]] = values[i]; }
         public System.Collections.Generic.Dictionary<string, string> ToDict() => _dict;
         public void Set(string k, string v) => _dict[k] = v;
     }
 
-    // Proper payload classes for JsonUtility
     [Serializable] private class ChatMessage { public string role; public string content; public ChatMessage(string role, string content){ this.role=role; this.content=content; } }
-    [Serializable] private class ChatPayload
-    {
-        public string model;
-        public float temperature;
-        public int max_tokens;
-        public ChatMessage[] messages;
-    }
-    [Serializable] private class OpenAIChatResponse
-    {
-        [Serializable] public class Message { public string role; public string content; }
-        [Serializable] public class Choice { public Message message; }
-        public Choice[] choices;
-    }
+    [Serializable] private class ChatPayload { public string model; public float temperature; public int max_tokens; public ChatMessage[] messages; }
+    [Serializable] private class OpenAIChatResponse { [Serializable] public class Message { public string role; public string content; } [Serializable] public class Choice { public Message message; } public Choice[] choices; }
 
     public void GenerateFromUserPrompt(string userPrompt)
     {
@@ -96,18 +72,13 @@ public class OpenAIProfileGenerator : MonoBehaviour
         var apiKey = llmProfile.ResolveApiKey();
         if (string.IsNullOrEmpty(apiKey)) { Debug.LogError("[OpenAIProfileGenerator] API key is empty."); yield break; }
 
-        // Build system message with optional previous state
         string previousBlock = (continueEditing && targetMatter != null) ? ("\n\n" + targetMatter.GetPreviousStateContext()) : "";
         string systemMsg = basePrompt + "\n\n" + objectContext + previousBlock;
         string userMsg = userPrompt;
 
         yield return SendChatAsync(systemMsg, userMsg, apiKey, (ok, contentOrErr) =>
         {
-            if (!ok)
-            {
-                Debug.LogError($"[OpenAIProfileGenerator] Generation failed: {contentOrErr}");
-                return;
-            }
+            if (!ok) { Debug.LogError($"[OpenAIProfileGenerator] Generation failed: {contentOrErr}"); return; }
 
             lastRawAssistant = contentOrErr;
 
@@ -124,7 +95,6 @@ public class OpenAIProfileGenerator : MonoBehaviour
                     if (applyParticles && prof.particle_json != null)
                         targetMatter.ApplyParticles(prof.particle_json);
 
-                    // remember what was applied for future edits
                     targetMatter.RememberLast(prof.lua_code, prof.particle_json);
                 }
 
@@ -168,28 +138,20 @@ public class OpenAIProfileGenerator : MonoBehaviour
         yield return req.SendWebRequest();
 
         if (req.result != UnityWebRequest.Result.Success)
-        {
-            done(false, req.error + "\n" + req.downloadHandler.text);
-            yield break;
-        }
+        { done(false, req.error + "\n" + req.downloadHandler.text); yield break; }
 
         try
         {
             var root = JsonUtility.FromJson<OpenAIChatResponse>(req.downloadHandler.text);
             if (root == null || root.choices == null || root.choices.Length == 0 || root.choices[0].message == null)
-            {
-                done(false, "Unexpected response format:\n" + req.downloadHandler.text);
-                yield break; // <-- FIX: use yield break inside IEnumerator
-            }
+            { done(false, "Unexpected response format:\n" + req.downloadHandler.text); yield break; }
 
             var content = root.choices[0].message.content;
             if (llmProfile.expectStrictJson) content = StripToFirstJsonObject(content);
             done(true, content);
         }
         catch (Exception ex)
-        {
-            done(false, "Parse response error: " + ex.Message + "\n" + req.downloadHandler.text);
-        }
+        { done(false, "Parse response error: " + ex.Message + "\n" + req.downloadHandler.text); }
     }
 
     private string StripToFirstJsonObject(string s)

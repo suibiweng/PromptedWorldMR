@@ -1,0 +1,19 @@
+fileFormatVersion: 2
+guid: fe04efa288b54c744b3e6990c9ca2526
+timeCreated: 1549339109
+licenseType: Store
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Internal/Editor/WebGLPostBuild.cs
+  uploadId: 487316

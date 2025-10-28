@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: aba473fa03006894eb50487d02bbc754
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/API/PDFBookmark.cs
+  uploadId: 487316

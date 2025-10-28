@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8adfe2e11f77eb44cae5a8cac55f6530
+timeCreated: 1572199983
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/RKSJ-H.bcmap
+  uploadId: 487316

@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using MoonSharp.Interpreter;
 using UnityEngine;
-using LuaProxies; // keep if your proxies live in this namespace
+using LuaProxies; // proxies namespace (Vector3Proxy, GameObjectProxy, PromptedMatterProxy, etc.)
 
 /// <summary>
 /// Runtime Lua behaviour with lazy, safe-guarded proxy binding.
 /// - Eagerly binds gameObject & transform.
 /// - Lazily exposes self.rigidbody, self.audio, self.particles, self.animator, self.collider, etc.
-///   If missing, adds a safe default where sensible (see EnsureComponent<T>() usage).
+/// - Adds: self.prompted / self.promptedMatter / self.pm  (PromptedMatterProxy)
+/// - DOTween: global 'dotween' injected per Script via LuaDOTweenBootstrap.
 /// - start(self), update(self, dt), on_trigger(self, other), on_collision(self, col), on_stop(self) supported.
 /// </summary>
 [DisallowMultipleComponent]
@@ -34,8 +35,12 @@ public class LuaBehaviour : MonoBehaviour
 
     public bool addAudioSourceIfMissing = true;
     public bool addParticleSystemIfMissing = true;
-    public bool addAnimatorIfMissing = false; // harmless but often unnecessary
-    public bool addBoxColliderIfMissing = false; // collider shapes matter; default off
+    public bool addAnimatorIfMissing = false;     // harmless but often unnecessary
+    public bool addBoxColliderIfMissing = false;  // collider shapes matter; default off
+
+    [Header("Legacy (optional)")]
+    [Tooltip("If true, self.programable / self.programmable / self.programableObject will be exposed.")]
+    public bool exposeProgramableProxy = false;
 
     [Header("Current Lua (preview)")]
     [SerializeField, TextArea(6, 30)] private string _currentLuaPreview;
@@ -55,7 +60,7 @@ public class LuaBehaviour : MonoBehaviour
 
     void Awake()
     {
-        // Safe: okay to call multiple times; registers all public userdata types in loaded assemblies.
+        // Safe: registers all public userdata types in loaded assemblies (idempotent).
         UserData.RegisterAssembly();
     }
 
@@ -172,7 +177,7 @@ public class LuaBehaviour : MonoBehaviour
         // New VM with your proxy-based environment
         _script = new Script(CoreModules.Preset_Default);
 
-        // Register proxy types (safe to call multiple times)
+        // Register proxy types (explicit; safe to call multiple times)
         UserData.RegisterType<Vector3Proxy>();
         UserData.RegisterType<GameObjectProxy>();
         UserData.RegisterType<TransformProxy>();
@@ -184,18 +189,19 @@ public class LuaBehaviour : MonoBehaviour
         UserData.RegisterType<ButtonProxy>();
         UserData.RegisterType<CollisionProxy>();
         UserData.RegisterType<LuaDOTween>();
-        UserData.RegisterType<ProgramableObjectProxy>();
+        UserData.RegisterType<PromptedMatterProxy>();
+        if (exposeProgramableProxy) UserData.RegisterType<ProgramableObjectProxy>();
 
-
-        //------extra safty
+        // (If any script wants to use raw Vector3 tables, this won’t hurt.)
         UserData.RegisterType<Vector3>();
 
-
-        // Globals: helpers + DOTween bridge
-        _script.Globals["dotween"] = new LuaDOTween();
-        _script.Globals["log"] = (Action<string>)((s) => Debug.Log($"[Lua] {s}"));
-        _script.Globals["warn"] = (Action<string>)((s) => Debug.LogWarning($"[Lua] {s}"));
+        // Globals: logs
+        _script.Globals["log"]   = (Action<string>)((s) => Debug.Log($"[Lua] {s}"));
+        _script.Globals["warn"]  = (Action<string>)((s) => Debug.LogWarning($"[Lua] {s}"));
         _script.Globals["error"] = (Action<string>)((s) => Debug.LogError($"[Lua] {s}"));
+
+        // DOTween: inject a fresh helper per-script
+        LuaDOTweenBootstrap.InjectInto(_script); // provides global 'dotween'
 
         // Create self table with lazy __index to auto-bind proxies on demand
         _self = new Table(_script);
@@ -217,48 +223,57 @@ public class LuaBehaviour : MonoBehaviour
                 case "gameObject":
                     bound = UserData.Create(new GameObjectProxy(gameObject));
                     break;
+
                 case "transform":
                     bound = UserData.Create(new TransformProxy(transform));
                     break;
+
                 case "rigidbody":
                 {
                     var rb = EnsureRigidbody();
                     if (rb != null) bound = UserData.Create(new RigidbodyProxy(rb));
                     break;
                 }
+
                 case "audio":
                 case "audioSource":
                 {
-                    var au = EnsureComponent<AudioSource>(addIfMissing: addAudioSourceIfMissing, afterAdd: a => {
+                    var au = EnsureComponent<AudioSource>(addIfMissing: addAudioSourceIfMissing, afterAdd: a =>
+                    {
                         a.playOnAwake = false;
                     });
                     if (au != null) bound = UserData.Create(new AudioSourceProxy(au));
                     break;
                 }
+
                 case "particles":
                 case "particleSystem":
                 {
-                    var ps = EnsureComponent<ParticleSystem>(addIfMissing: addParticleSystemIfMissing, afterAdd: p => {
+                    var ps = EnsureComponent<ParticleSystem>(addIfMissing: addParticleSystemIfMissing, afterAdd: p =>
+                    {
                         var main = p.main; main.loop = false; // reasonable default
                         p.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
                     });
                     if (ps != null) bound = UserData.Create(new ParticleSystemProxy(ps));
                     break;
                 }
+
                 case "animator":
                 {
                     var an = EnsureComponent<Animator>(addIfMissing: addAnimatorIfMissing);
                     if (an != null) bound = UserData.Create(new AnimatorProxy(an));
                     break;
                 }
+
                 case "collider":
                 {
                     // Only add if explicitly enabled; default off because shape matters.
                     var col = GetComponent<Collider>();
                     if (col == null && addBoxColliderIfMissing) col = gameObject.AddComponent<BoxCollider>();
-                    if (col != null) bound = UserData.Create(new GameObjectProxy(col.gameObject)); // or ColliderProxy if you have one
+                    if (col != null) bound = UserData.Create(new GameObjectProxy(col.gameObject)); // or ColliderProxy if you add one
                     break;
                 }
+
                 // UI/Text/Button are "resolve-only" by default (no auto-adds)
                 case "text":
                 {
@@ -267,21 +282,34 @@ public class LuaBehaviour : MonoBehaviour
                     break;
                 }
                 case "button":
-                    {
-                        var btn = GetComponentInChildren<UnityEngine.UI.Button>();
-                        if (btn != null) bound = UserData.Create(new ButtonProxy(btn));
-                        break;
-                    }
+                {
+                    var btn = GetComponentInChildren<UnityEngine.UI.Button>();
+                    if (btn != null) bound = UserData.Create(new ButtonProxy(btn));
+                    break;
+                }
+
+                // ---- NEW: PromptedMatter proxy (preferred) ----
+                case "prompted":
+                case "promptedMatter":
+                case "pm":
+                {
+                    var pm = GetComponentInParent<PromptedMatter>();
+                    if (pm != null) bound = UserData.Create(new PromptedMatterProxy(pm));
+                    break;
+                }
+
+                // ---- Legacy (optional) ProgramableObject proxy ----
                 case "programable":
                 case "programmable":
                 case "programableObject":
                 {
-    var po = GetComponent<ProgramableObject>();   // same GO as LuaBehaviour
-    if (po != null)
-        bound = UserData.Create(new ProgramableObjectProxy(po));
-    break;
-}
-
+                    if (exposeProgramableProxy)
+                    {
+                        var po = GetComponent<ProgramableObject>();
+                        if (po != null) bound = UserData.Create(new ProgramableObjectProxy(po));
+                    }
+                    break;
+                }
             }
 
             if (bound.IsNotNil())
@@ -291,7 +319,7 @@ public class LuaBehaviour : MonoBehaviour
         }));
         _self.MetaTable = mt;
 
-        // Optionally eager-bind must-haves:
+        // Eager-bind must-haves:
         _self["gameObject"] = UserData.Create(new GameObjectProxy(gameObject));
         _self["transform"]  = UserData.Create(new TransformProxy(transform));
 
@@ -299,11 +327,11 @@ public class LuaBehaviour : MonoBehaviour
         _script.DoString(src);
 
         // Cache function handles if present
-        _fnStart       = _script.Globals.Get("start");
-        _fnUpdate      = _script.Globals.Get("update");
-        _fnOnTrigger   = _script.Globals.Get("on_trigger");
-        _fnOnCollision = _script.Globals.Get("on_collision");
-        _fnOnStopOptional = _script.Globals.Get("on_stop");
+        _fnStart         = _script.Globals.Get("start");
+        _fnUpdate        = _script.Globals.Get("update");
+        _fnOnTrigger     = _script.Globals.Get("on_trigger");
+        _fnOnCollision   = _script.Globals.Get("on_collision");
+        _fnOnStopOptional= _script.Globals.Get("on_stop");
 
         // Keep preview synced
         _currentLuaPreview = src ?? string.Empty;
@@ -332,7 +360,7 @@ public class LuaBehaviour : MonoBehaviour
 
     /// <summary>
     /// Ensures there's a Rigidbody. If missing and allowed, adds one with safe defaults,
-    /// then returns it. Also updates cache entry for 'rigidbody' if already requested.
+    /// then returns it.
     /// </summary>
     public Rigidbody EnsureRigidbody()
     {
@@ -367,7 +395,3 @@ static class DynValueExtensions
     public static bool IsNotNil(this DynValue dv)
         => dv != null && dv.Type != DataType.Nil && dv.Type != DataType.Void;
 }
-
-
-
-

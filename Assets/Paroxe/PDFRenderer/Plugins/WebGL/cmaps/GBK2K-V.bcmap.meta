@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 7e647f7e4a3849f44b12ae04e911a656
+timeCreated: 1572199983
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/GBK2K-V.bcmap
+  uploadId: 487316

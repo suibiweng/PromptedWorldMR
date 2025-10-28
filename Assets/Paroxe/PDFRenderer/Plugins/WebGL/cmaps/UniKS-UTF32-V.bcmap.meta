@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 88840e3dc216f664bb192a55864dae21
+timeCreated: 1572199983
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/UniKS-UTF32-V.bcmap
+  uploadId: 487316

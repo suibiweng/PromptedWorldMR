@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fff70baeb0c7c2e4b92f320167552178
+timeCreated: 1572199984
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/Ext-H.bcmap
+  uploadId: 487316

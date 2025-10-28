@@ -1,0 +1,19 @@
+fileFormatVersion: 2
+guid: 16c365fa818f74a409d1d94e84b13d0f
+timeCreated: 1503972139
+licenseType: Store
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Internal/Scripts/NativeDisposeCoordinator.cs
+  uploadId: 487316

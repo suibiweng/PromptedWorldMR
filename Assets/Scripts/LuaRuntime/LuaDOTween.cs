@@ -250,3 +250,30 @@ public class LuaDOTween
         return RotateTo(tProxy, e.x, e.y, z, duration, ease);
     }
 }
+
+
+
+public static class LuaDOTweenBootstrap
+{
+    private static bool _registered;
+
+    /// <summary>
+    /// Call once per Script after you create it:
+    ///     LuaDOTweenBootstrap.InjectInto(script);
+    /// Ensures 'dotween' global is available in Lua.
+    /// </summary>
+    public static void InjectInto(Script script)
+    {
+        if (script == null) return;
+
+        if (!_registered)
+        {
+            // Register the LuaDOTween type (and any other user data already registered elsewhere)
+            UserData.RegisterType<LuaDOTween>(); // your class from LuaDOTween.cs
+            _registered = true;
+        }
+
+        // Provide a fresh helper per Script
+        script.Globals["dotween"] = new LuaDOTween();
+    }
+}

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fd4313f6f695cac47b15db146fa41cb9
+timeCreated: 1572199984
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/ETen-B5-V.bcmap
+  uploadId: 487316

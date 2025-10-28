@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a48a555af8d7cab4fae5ff3009cbe57d
+timeCreated: 1572199983
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/Adobe-Korea1-UCS2.bcmap
+  uploadId: 487316

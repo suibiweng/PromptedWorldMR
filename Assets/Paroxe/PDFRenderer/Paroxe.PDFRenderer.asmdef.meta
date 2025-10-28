@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 3286a49761f075546948f5ee6bec83dc
+AssemblyDefinitionImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Paroxe.PDFRenderer.asmdef
+  uploadId: 487316

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: efc6718804cdb744a8215b0d6fcf8705
+timeCreated: 1572199984
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/Hiragana.bcmap
+  uploadId: 487316

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a898d8826df9edc42964b461f7f1c47b
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Internal/Scripts/Viewer/PDFThumbnailsViewer.cs
+  uploadId: 487316

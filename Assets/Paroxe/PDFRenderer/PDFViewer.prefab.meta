@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f10f8c4f3a820d44c9e68a31a19f6708
+timeCreated: 1505263353
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/PDFViewer.prefab
+  uploadId: 487316

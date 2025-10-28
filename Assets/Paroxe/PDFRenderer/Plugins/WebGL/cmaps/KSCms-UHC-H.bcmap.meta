@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 6425a7ec4877ce04497b3829d666a724
+timeCreated: 1572199982
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/KSCms-UHC-H.bcmap
+  uploadId: 487316

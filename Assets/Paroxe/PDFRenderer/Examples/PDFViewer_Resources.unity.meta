@@ -1,0 +1,13 @@
+fileFormatVersion: 2
+guid: 1505407c195928a438407fe49f129c89
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Examples/PDFViewer_Resources.unity
+  uploadId: 487316

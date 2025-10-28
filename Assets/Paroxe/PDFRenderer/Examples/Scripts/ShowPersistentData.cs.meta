@@ -1,0 +1,19 @@
+fileFormatVersion: 2
+guid: 0a4271c656a4e194a823fcb64bb36c10
+timeCreated: 1500684291
+licenseType: Store
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Examples/Scripts/ShowPersistentData.cs
+  uploadId: 487316

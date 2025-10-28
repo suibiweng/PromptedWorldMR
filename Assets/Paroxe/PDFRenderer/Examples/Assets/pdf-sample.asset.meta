@@ -1,0 +1,13 @@
+fileFormatVersion: 2
+guid: 486cc9297fbba88488cf04e6e256de63
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Examples/Assets/pdf-sample.asset
+  uploadId: 487316

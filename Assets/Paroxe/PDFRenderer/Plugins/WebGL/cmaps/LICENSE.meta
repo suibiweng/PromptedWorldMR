@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: f29fe2a154ab41e4f9ca5bc8d80faa53
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/LICENSE
+  uploadId: 487316

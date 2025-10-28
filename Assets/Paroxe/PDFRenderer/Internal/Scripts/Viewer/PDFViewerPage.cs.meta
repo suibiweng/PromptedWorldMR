@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 6b8022b60d23be148a1cf80ab4fcca24
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Internal/Scripts/Viewer/PDFViewerPage.cs
+  uploadId: 487316

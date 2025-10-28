@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f2654b5b27ba5374199b4fc85a7eda17
+timeCreated: 1572199984
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/HKdla-B5-V.bcmap
+  uploadId: 487316

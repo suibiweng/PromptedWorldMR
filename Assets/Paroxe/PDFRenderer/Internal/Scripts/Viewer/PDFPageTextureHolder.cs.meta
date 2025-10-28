@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d7d9d4ec03b7e8448ada99d5d194158f
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Internal/Scripts/Viewer/PDFPageTextureHolder.cs
+  uploadId: 487316

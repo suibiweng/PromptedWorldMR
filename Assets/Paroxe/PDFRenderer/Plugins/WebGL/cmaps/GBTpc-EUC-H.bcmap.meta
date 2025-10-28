@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: e861d9bd92bdd8f498acfccd927dafe7
+timeCreated: 1572199984
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/GBTpc-EUC-H.bcmap
+  uploadId: 487316

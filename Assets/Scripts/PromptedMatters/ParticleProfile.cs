@@ -58,12 +58,16 @@ public class ParticleProfile
         public CurveData curve;
     }
 
-    [Serializable] public class Noise
-    {
-        public bool? enabled;
-        public float? strength;
-        public float? frequency;
-    }
+[System.Serializable]
+public class Noise
+{
+    public bool? enabled;          // on/off
+    public float? strength;        // overall turbulence strength
+    public float? frequency;       // > 0
+    public float? scrollSpeed;     // NEW: flow speed over time (units/s)
+    public string quality;         // NEW: "Low" | "Medium" | "High" (case-insensitive)
+}
+
 
     [Serializable] public class RendererSettings
     {

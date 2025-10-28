@@ -1,0 +1,11 @@
+fileFormatVersion: 2
+guid: 81e5729ced5b9cf41abcf1c8bf3813d1
+TextScriptImporter:
+  userData: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Third-Party Notice.txt
+  uploadId: 487316

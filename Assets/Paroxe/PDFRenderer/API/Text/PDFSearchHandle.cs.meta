@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a584234d21075644bbe8d23974457532
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/API/Text/PDFSearchHandle.cs
+  uploadId: 487316

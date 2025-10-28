@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: c17f157d00492fe4cb497cdba6ec98cf
+timeCreated: 1572199984
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/GBT-V.bcmap
+  uploadId: 487316

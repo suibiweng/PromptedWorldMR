@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 352f3157d9c15bd48a2982ad0e5c77c7
+timeCreated: 1572199982
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/UniJISPro-UTF8-V.bcmap
+  uploadId: 487316

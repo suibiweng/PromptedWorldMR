@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f3ac441d94ac7864aab6a0dc027c53fe
+timeCreated: 1572199984
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/UniGB-UCS2-H.bcmap
+  uploadId: 487316

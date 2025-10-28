@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 95209bb5f56c1e748985849e44233cf9
+timeCreated: 1572199983
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 32815
+  packageName: PDF Renderer
+  packageVersion: 5.51
+  assetPath: Assets/Paroxe/PDFRenderer/Plugins/WebGL/cmaps/CNS2-V.bcmap
+  uploadId: 487316
