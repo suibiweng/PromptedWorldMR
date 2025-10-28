@@ -448,15 +448,40 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
 
     void OnSubmitClicked()
     {
+        // Read prompt + visible body
         string prompt = UIX.GetTextFromComponent(_panelPromptText) ?? "";
-        string current = UIX.GetTextFromComponent(_panelBodyText) ?? "";
-        string processed = ProcessParagraphWithPrompt(current, prompt);
+        string bodyNow = UIX.GetTextFromComponent(_panelBodyText) ?? "";
+
+        // Build context (prompt + selected paragraph + full page text)
+        string selectedParagraph = bodyNow; // this body is what you showed for the clicked paragraph
+        string context =
+            "PROMPT:\n" + prompt + "\n\n" +
+            "SELECTED PARAGRAPH:\n" + selectedParagraph + "\n\n" +
+            "FULL PAGE TEXT (reference):\n" + fullText;
+
+        // TODO: swap this for the real OpenAI call later
+        string processed = ProcessWithLLM_Placeholder(prompt, selectedParagraph, fullText, context);
+
+        // Write result back to the panel body (or create a separate “Processed” text if you prefer)
         UIX.SetTextOnComponent(_panelBodyText, processed);
 
+        // Resize after updating text
         var preferred = GetPreferredHeight(_panelBodyText, processed, _bodyRT.sizeDelta.x);
         _bodyRT.sizeDelta = new Vector2(_bodyRT.sizeDelta.x, preferred);
         _contentRT.sizeDelta = new Vector2(_contentRT.sizeDelta.x, preferred + _promptRowRT.sizeDelta.y + 36f);
     }
+
+string ProcessWithLLM_Placeholder(string prompt, string selectedParagraph, string full, string combinedContext)
+{
+    // Replace with your real OpenAI request later
+    return
+        "[DEMO OUTPUT]\n" +
+        "This is where the LLM answer will go.\n\n" +
+        "Prompt:\n" + prompt + "\n\n" +
+        "We referenced the selected paragraph and (if needed) other parts of the page.";
+}
+
+
 
     string ProcessParagraphWithPrompt(string paragraph, string prompt)
     {

@@ -4,39 +4,59 @@ using UnityEngine.UI;
 
 public class ParagraphPanel : MonoBehaviour
 {
-    // ----- Public API used by other scripts -----
-    public Button ownerButton { get; set; }              // set by manager/renderer
-    public float reservedHeight { get; set; } = 300f;    // layout hint
+    // ===== Public API used by other scripts =====
+    public Button ownerButton { get; set; }            // set by manager/renderer
+    public float reservedHeight { get; set; } = 300f;  // layout hint for external layouters
 
     // Events
     public event Action<ParagraphPanel> onAnyChanged;
     public event Action<ParagraphPanel> onClose;
-    public event Action<ParagraphPanel, string, string> onSubmit; // (self, prompt, body)
+    // (self, prompt, bodyShownInPanel)
+    public event Action<ParagraphPanel, string, string> onSubmit;
 
-    // Public helpers other code may call
-    public void SetTitle(string title)   { if (_title) _title.text = title ?? "Paragraph"; FireChanged(); }
-    public void SetBody(string body)     { if (_body)  _body.text  = body ?? "";           FireChanged(); }
-    public void SetProcessed(string txt) { if (_processed) _processed.text = txt ?? "";    FireChanged(); }
+    // --- Public helpers other code may call ---
+    public void SetTitle(string title)
+    {
+        if (_title) _title.text = title ?? "Paragraph";
+        FireChanged();
+    }
+
+    public void SetBody(string body)
+    {
+        if (_body) _body.text = body ?? "";
+        FireChanged();
+    }
+
+    public void SetProcessed(string txt)
+    {
+        if (_processed) _processed.text = txt ?? "";
+        FireChanged();
+    }
+
+    /// <summary>Externally force panel height and re-layout internal areas.</summary>
     public void SetHeight(float h)
     {
         reservedHeight = Mathf.Max(120f, h);
+
         if (_rt) _rt.sizeDelta = new Vector2(_rt.sizeDelta.x, reservedHeight);
+
         if (_bodyRT && _footerRT)
         {
+            // Body takes most of the height; footer sits below it
             _bodyRT.sizeDelta = new Vector2(_bodyRT.sizeDelta.x, Mathf.Max(80f, reservedHeight - 140f));
             _footerRT.anchoredPosition = new Vector2(_footerRT.anchoredPosition.x, -(48f + _bodyRT.sizeDelta.y + 6f));
         }
         FireChanged();
     }
 
-    // API some callers referenced previously
+    /// <summary>Shorthand setter used by some callers.</summary>
     public void SetContent(string title, string body)
     {
         SetTitle(title);
         SetBody(body);
     }
 
-    // Expose a callable submit trigger (not the event)
+    /// <summary>Raise the submit event with (prompt, body) values currently in the panel.</summary>
     public void OnSubmit()
     {
         var prompt = _prompt ? _prompt.text : "";
@@ -44,7 +64,7 @@ public class ParagraphPanel : MonoBehaviour
         onSubmit?.Invoke(this, prompt, body);
     }
 
-    // Ensure we only build visuals once
+    /// <summary>Ensure visuals are built exactly once. Call with desired size.</summary>
     public void BuildIfNeeded(Vector2 size)
     {
         if (_built) return;
@@ -60,7 +80,7 @@ public class ParagraphPanel : MonoBehaviour
     Button _copyBtn, _closeBtn, _submitBtn;
     bool _built = false;
 
-    // ===== Build UI =====
+    // ===== Build UI (call via BuildIfNeeded) =====
     public void InitVisual(Vector2 size)
     {
         reservedHeight = size.y > 0 ? size.y : reservedHeight;
@@ -70,11 +90,12 @@ public class ParagraphPanel : MonoBehaviour
         img.color = new Color(1, 1, 1, 0.95f);
 
         _rt = GetComponent<RectTransform>();
-        _rt.anchorMin = _rt.anchorMax = new Vector2(0, 1);
+        if (_rt == null) _rt = gameObject.AddComponent<RectTransform>();
+        _rt.anchorMin = _rt.anchorMax = new Vector2(0, 1); // top-left anchored
         _rt.pivot = new Vector2(0, 1);
         _rt.sizeDelta = new Vector2(size.x, reservedHeight);
 
-        // Header
+        // ----- Header -----
         var header = new GameObject("Header", typeof(RectTransform), typeof(Image));
         header.transform.SetParent(transform, false);
         var headerRT = header.GetComponent<RectTransform>();
@@ -98,7 +119,7 @@ public class ParagraphPanel : MonoBehaviour
         _closeBtn = CreateMiniButton(headerRT, "Close", new Vector2(size.x - 66f, -6f), new Vector2(56f, 30f));
         _closeBtn.onClick.AddListener(() => { onClose?.Invoke(this); });
 
-        // Body
+        // ----- Body -----
         var bodyGO = new GameObject("Body", typeof(RectTransform));
         bodyGO.transform.SetParent(transform, false);
         _bodyRT = bodyGO.GetComponent<RectTransform>();
@@ -113,9 +134,9 @@ public class ParagraphPanel : MonoBehaviour
         brt.sizeDelta = _bodyRT.sizeDelta;
         _body.alignment = TextAnchor.UpperLeft;
         _body.horizontalOverflow = HorizontalWrapMode.Wrap;
-        _body.verticalOverflow   = VerticalWrapMode.Overflow; // << correct enum
+        _body.verticalOverflow   = VerticalWrapMode.Overflow;
 
-        // Footer (Prompt + Submit + Processed)
+        // ----- Footer (Prompt + Submit + Processed) -----
         var footer = new GameObject("Footer", typeof(RectTransform));
         footer.transform.SetParent(transform, false);
         _footerRT = footer.GetComponent<RectTransform>();
@@ -152,14 +173,14 @@ public class ParagraphPanel : MonoBehaviour
         prt2.anchoredPosition = new Vector2(0, -36f);
         prt2.sizeDelta = new Vector2(_footerRT.sizeDelta.x, 40f);
         _processed.horizontalOverflow = HorizontalWrapMode.Wrap;
-        _processed.verticalOverflow   = VerticalWrapMode.Overflow; // << correct enum
+        _processed.verticalOverflow   = VerticalWrapMode.Overflow;
 
         FireChanged();
     }
 
     void FireChanged() => onAnyChanged?.Invoke(this);
 
-    // ===== Small UI helpers =====
+    // ===== Small UI helpers (legacy Text only; no TMP) =====
     Text CreateText(Transform parent, string name, string content, int size, FontStyle style, bool forInput = false)
     {
         var go = new GameObject(name, typeof(RectTransform), typeof(Text));
@@ -172,6 +193,7 @@ public class ParagraphPanel : MonoBehaviour
         tx.text = content;
         tx.fontStyle = style;
 
+        // Safe built-in font (new Unity versions deprecated Arial builtin)
         Font builtin = null;
         try { builtin = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); } catch { }
         tx.font = builtin ?? Font.CreateDynamicFontFromOSFont("Arial", size);
