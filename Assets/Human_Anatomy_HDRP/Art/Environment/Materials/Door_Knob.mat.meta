@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: e37155d30c1c8ce4a948780ce70caea6
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 147001
+  packageName: Human_Anatomy_HDRP
+  packageVersion: 1.0
+  assetPath: Assets/Human_Anatomy_HDRP/Art/Environment/Materials/Door_Knob.mat
+  uploadId: 315629

@@ -1,0 +1,184 @@
+fileFormatVersion: 2
+guid: 3ec3533259097b947be933846d553df8
+ModelImporter:
+  serializedVersion: 23
+  fileIDToRecycleName:
+    100000: Bronchi1
+    100002: Larynx1
+    100004: Larynx2
+    100006: Larynx3
+    100008: Larynx4
+    100010: Larynx5
+    100012: //RootNode
+    100014: Lungs0:P1
+    100016: Lungs0:P2
+    100018: Lungs0:P3
+    100020: Lungs0:P4
+    100022: Lungs0:P5
+    100024: Trachea
+    400000: Bronchi1
+    400002: Larynx1
+    400004: Larynx2
+    400006: Larynx3
+    400008: Larynx4
+    400010: Larynx5
+    400012: //RootNode
+    400014: Lungs0:P1
+    400016: Lungs0:P2
+    400018: Lungs0:P3
+    400020: Lungs0:P4
+    400022: Lungs0:P5
+    400024: Trachea
+    2100000: Lungs_M
+    2100002: Trachea_M
+    2100004: Bronchi_M
+    2100006: Larynx_M
+    2300000: Bronchi1
+    2300002: Larynx1
+    2300004: Larynx2
+    2300006: Larynx3
+    2300008: Larynx4
+    2300010: Larynx5
+    2300012: Lungs0:P1
+    2300014: Lungs0:P2
+    2300016: Lungs0:P3
+    2300018: Lungs0:P4
+    2300020: Lungs0:P5
+    2300022: Trachea
+    3300000: Bronchi1
+    3300002: Larynx1
+    3300004: Larynx2
+    3300006: Larynx3
+    3300008: Larynx4
+    3300010: Larynx5
+    3300012: Lungs0:P1
+    3300014: Lungs0:P2
+    3300016: Lungs0:P3
+    3300018: Lungs0:P4
+    3300020: Lungs0:P5
+    3300022: Trachea
+    4300000: Lungs0:P3
+    4300002: Lungs0:P2
+    4300004: Lungs0:P1
+    4300006: Lungs0:P5
+    4300008: Lungs0:P4
+    4300010: Trachea
+    4300012: Bronchi1
+    4300014: Larynx3
+    4300016: Larynx4
+    4300018: Larynx5
+    4300020: Larynx1
+    4300022: Larynx2
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Bronchi_M
+    second: {fileID: 2100000, guid: 8a8a7db37ccdebc4590433228db10a60, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Larynx_M
+    second: {fileID: 2100000, guid: af694ab04efab6e4fa214cf01c6c4dc5, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Lungs_M
+    second: {fileID: 2100000, guid: c4dcd14b0999a124ebfcd5675c284889, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Trachea_M
+    second: {fileID: 2100000, guid: de786780b7024f649aa0d22beea6ff0a, type: 2}
+  materials:
+    importMaterials: 1
+    materialName: 0
+    materialSearch: 1
+    materialLocation: 1
+  animations:
+    legacyGenerateAnimations: 4
+    bakeSimulation: 0
+    resampleCurves: 1
+    optimizeGameObjects: 0
+    motionNodeName: 
+    rigImportErrors: 
+    rigImportWarnings: 
+    animationImportErrors: 
+    animationImportWarnings: 
+    animationRetargetingWarnings: 
+    animationDoRetargetingWarnings: 0
+    importAnimatedCustomProperties: 0
+    importConstraints: 0
+    animationCompression: 1
+    animationRotationError: 0.5
+    animationPositionError: 0.5
+    animationScaleError: 0.5
+    animationWrapMode: 0
+    extraExposedTransformPaths: []
+    extraUserProperties: []
+    clipAnimations: []
+    isReadable: 1
+  meshes:
+    lODScreenPercentages: []
+    globalScale: 1
+    meshCompression: 0
+    addColliders: 0
+    useSRGBMaterialColor: 1
+    importVisibility: 1
+    importBlendShapes: 1
+    importCameras: 1
+    importLights: 1
+    swapUVChannels: 0
+    generateSecondaryUV: 1
+    useFileUnits: 1
+    optimizeMeshForGPU: 1
+    keepQuads: 0
+    weldVertices: 1
+    preserveHierarchy: 0
+    indexFormat: 0
+    secondaryUVAngleDistortion: 8
+    secondaryUVAreaDistortion: 15
+    secondaryUVHardAngle: 88
+    secondaryUVPackMargin: 18
+    useFileScale: 1
+    previousCalculatedGlobalScale: 1
+    hasPreviousCalculatedGlobalScale: 0
+  tangentSpace:
+    normalSmoothAngle: 60
+    normalImportMode: 0
+    tangentImportMode: 3
+    normalCalculationMode: 4
+    legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 0
+    blendShapeNormalImportMode: 1
+    normalSmoothingSource: 0
+  importAnimation: 1
+  copyAvatar: 0
+  humanDescription:
+    serializedVersion: 2
+    human: []
+    skeleton: []
+    armTwist: 0.5
+    foreArmTwist: 0.5
+    upperLegTwist: 0.5
+    legTwist: 0.5
+    armStretch: 0.05
+    legStretch: 0.05
+    feetSpacing: 0
+    rootMotionBoneName: 
+    hasTranslationDoF: 0
+    hasExtraRoot: 0
+    skeletonHasParents: 1
+  lastHumanDescriptionAvatarSource: {instanceID: 0}
+  animationType: 0
+  humanoidOversampling: 1
+  additionalBone: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 147001
+  packageName: Human_Anatomy_HDRP
+  packageVersion: 1.0
+  assetPath: Assets/Human_Anatomy_HDRP/Art/Human_Anatomy_Models/respiratory system/Lungs.fbx
+  uploadId: 315629

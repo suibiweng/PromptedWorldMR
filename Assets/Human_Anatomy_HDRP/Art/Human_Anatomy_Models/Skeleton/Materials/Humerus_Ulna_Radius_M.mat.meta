@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 26f53327443b6e04281767bc618a6dc1
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 147001
+  packageName: Human_Anatomy_HDRP
+  packageVersion: 1.0
+  assetPath: Assets/Human_Anatomy_HDRP/Art/Human_Anatomy_Models/Skeleton/Materials/Humerus_Ulna_Radius_M.mat
+  uploadId: 315629

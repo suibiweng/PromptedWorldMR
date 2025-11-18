@@ -1,0 +1,209 @@
+fileFormatVersion: 2
+guid: 3b9a25b448c3a534f8ca224bc25a68bd
+ModelImporter:
+  serializedVersion: 23
+  fileIDToRecycleName:
+    100000: Bladder:Bladder
+    100002: Colon:Colon
+    100004: //RootNode
+    100006: Gallbladder:Line008
+    100008: Gallbladder:Line009
+    100010: Gallbladder:Line010
+    100012: Liver1
+    100014: Liver_Loft
+    100016: Pancreas:Line011
+    100018: Pancreas:pancreas
+    100020: Small_intestine:small_intestine
+    100022: Spleen1
+    100024: Stomach:Stomach
+    400000: Bladder:Bladder
+    400002: Colon:Colon
+    400004: //RootNode
+    400006: Gallbladder:Line008
+    400008: Gallbladder:Line009
+    400010: Gallbladder:Line010
+    400012: Liver1
+    400014: Liver_Loft
+    400016: Pancreas:Line011
+    400018: Pancreas:pancreas
+    400020: Small_intestine:small_intestine
+    400022: Spleen1
+    400024: Stomach:Stomach
+    2100000: Stomach_M
+    2100002: Small_Intestine_M
+    2100004: Liver_Material
+    2100006: Spleen_M
+    2100008: Colon_M
+    2100010: Pancreas_M
+    2100012: Bladder_M
+    2100014: Gall_Bladder_M
+    2300000: Bladder:Bladder
+    2300002: Colon:Colon
+    2300004: Gallbladder:Line008
+    2300006: Gallbladder:Line009
+    2300008: Gallbladder:Line010
+    2300010: Liver1
+    2300012: Liver_Loft
+    2300014: Pancreas:Line011
+    2300016: Pancreas:pancreas
+    2300018: Small_intestine:small_intestine
+    2300020: Spleen1
+    2300022: Stomach:Stomach
+    3300000: Bladder:Bladder
+    3300002: Colon:Colon
+    3300004: Gallbladder:Line008
+    3300006: Gallbladder:Line009
+    3300008: Gallbladder:Line010
+    3300010: Liver1
+    3300012: Liver_Loft
+    3300014: Pancreas:Line011
+    3300016: Pancreas:pancreas
+    3300018: Small_intestine:small_intestine
+    3300020: Spleen1
+    3300022: Stomach:Stomach
+    4300000: Stomach:Stomach
+    4300002: Small_intestine:small_intestine
+    4300004: Liver_Loft
+    4300006: Liver1
+    4300008: Spleen1
+    4300010: Colon:Colon
+    4300012: Pancreas:pancreas
+    4300014: Pancreas:Line011
+    4300016: Bladder:Bladder
+    4300018: Gallbladder:Line008
+    4300020: Gallbladder:Line010
+    4300022: Gallbladder:Line009
+    2186277476908879412: ImportLogs
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Bladder_M
+    second: {fileID: 2100000, guid: 1c17782e6ac85fc4281336b3fcb735f8, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Colon_M
+    second: {fileID: 2100000, guid: 62d280df9e521074a924edaf9f868d0e, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Gall_Bladder_M
+    second: {fileID: 2100000, guid: d33ea047804cddd459b38b37674b10f0, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Liver_Material
+    second: {fileID: 2100000, guid: be863e377e519bb4f8da9b7e7ca8302b, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Pancreas_M
+    second: {fileID: 2100000, guid: 244de8973cb4d6f4fbdab79bab480571, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Small_Intestine_M
+    second: {fileID: 2100000, guid: 90fd4ea371c45d84b92f2166fb426983, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Spleen_M
+    second: {fileID: 2100000, guid: 6a79dec5216a3cb40a587eb078e1cc12, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Stomach_M
+    second: {fileID: 2100000, guid: 6ed734a1f33211f4da9c202b84958195, type: 2}
+  materials:
+    importMaterials: 1
+    materialName: 0
+    materialSearch: 1
+    materialLocation: 1
+  animations:
+    legacyGenerateAnimations: 4
+    bakeSimulation: 0
+    resampleCurves: 1
+    optimizeGameObjects: 0
+    motionNodeName: 
+    rigImportErrors: 
+    rigImportWarnings: 
+    animationImportErrors: 
+    animationImportWarnings: 
+    animationRetargetingWarnings: 
+    animationDoRetargetingWarnings: 0
+    importAnimatedCustomProperties: 0
+    importConstraints: 0
+    animationCompression: 1
+    animationRotationError: 0.5
+    animationPositionError: 0.5
+    animationScaleError: 0.5
+    animationWrapMode: 0
+    extraExposedTransformPaths: []
+    extraUserProperties: []
+    clipAnimations: []
+    isReadable: 1
+  meshes:
+    lODScreenPercentages: []
+    globalScale: 1
+    meshCompression: 0
+    addColliders: 0
+    useSRGBMaterialColor: 1
+    importVisibility: 1
+    importBlendShapes: 1
+    importCameras: 1
+    importLights: 1
+    swapUVChannels: 0
+    generateSecondaryUV: 1
+    useFileUnits: 1
+    optimizeMeshForGPU: 1
+    keepQuads: 0
+    weldVertices: 1
+    preserveHierarchy: 0
+    indexFormat: 0
+    secondaryUVAngleDistortion: 8
+    secondaryUVAreaDistortion: 15
+    secondaryUVHardAngle: 88
+    secondaryUVPackMargin: 18
+    useFileScale: 1
+    previousCalculatedGlobalScale: 1
+    hasPreviousCalculatedGlobalScale: 0
+  tangentSpace:
+    normalSmoothAngle: 60
+    normalImportMode: 0
+    tangentImportMode: 3
+    normalCalculationMode: 4
+    legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 0
+    blendShapeNormalImportMode: 1
+    normalSmoothingSource: 0
+  importAnimation: 1
+  copyAvatar: 0
+  humanDescription:
+    serializedVersion: 2
+    human: []
+    skeleton: []
+    armTwist: 0.5
+    foreArmTwist: 0.5
+    upperLegTwist: 0.5
+    legTwist: 0.5
+    armStretch: 0.05
+    legStretch: 0.05
+    feetSpacing: 0
+    rootMotionBoneName: 
+    hasTranslationDoF: 0
+    hasExtraRoot: 0
+    skeletonHasParents: 1
+  lastHumanDescriptionAvatarSource: {instanceID: 0}
+  animationType: 0
+  humanoidOversampling: 1
+  additionalBone: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 147001
+  packageName: Human_Anatomy_HDRP
+  packageVersion: 1.0
+  assetPath: Assets/Human_Anatomy_HDRP/Art/Human_Anatomy_Models/Digestive_system/Digestive_system.fbx
+  uploadId: 315629

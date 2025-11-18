@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 5625629126407638288}
   - component: {fileID: 4722008663873216790}
   - component: {fileID: 6001101843390333920}
-  m_Layer: 5
+  m_Layer: 0
   m_Name: Text (TMP)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -274,7 +274,7 @@ GameObject:
   - component: {fileID: 846267254250448873}
   - component: {fileID: 3990562389154043616}
   - component: {fileID: 7246929687969938611}
-  m_Layer: 5
+  m_Layer: 0
   m_Name: 2DDisplay
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -883,7 +883,7 @@ MonoBehaviour:
   userRoot: {fileID: 0}
   userLeftHand: {fileID: 0}
   userRightHand: {fileID: 0}
-  Touchingdistance: 0.1
+  Touchingdistance: 0.2
   isToching: 0
   onHoverEnter:
     m_PersistentCalls:
@@ -954,6 +954,7 @@ MonoBehaviour:
   addParticleSystemIfMissing: 1
   addAnimatorIfMissing: 0
   addBoxColliderIfMissing: 0
+  exposeProgramableProxy: 1
   _currentLuaPreview: 
 --- !u!1 &8102332530202665709
 GameObject:
@@ -1042,7 +1043,7 @@ GameObject:
   - component: {fileID: 8030544663377861419}
   - component: {fileID: 7025453768062007271}
   - component: {fileID: 4107839714395958524}
-  m_Layer: 5
+  m_Layer: 0
   m_Name: RawImage
   m_TagString: Untagged
   m_Icon: {fileID: 0}

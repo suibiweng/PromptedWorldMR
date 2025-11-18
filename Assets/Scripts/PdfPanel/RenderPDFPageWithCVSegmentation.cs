@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using Paroxe.PdfRenderer;
 
 // OpenCVForUnity
@@ -18,12 +19,18 @@ using OpenCVForUnity.UnityUtils;
 using CvRect = OpenCVForUnity.CoreModule.Rect;
 using URect  = UnityEngine.Rect;
 
+using TMPro;
+
 public class RenderPDFPageWithCVSegmentation : MonoBehaviour
 {
     [Header("PDF Source")]
     public string pdfUrl;
     public string password = null;
     public int pageIndex = 0;
+
+    [Header("Prompt Prefab (TMP)")]
+    [Tooltip("Assign a prefab that contains a TMP_InputField somewhere under it.")]
+    public GameObject promptFieldPrefab;
 
     [Header("UI (assign in Scene)")]
     public RawImage pageImage;           // Texture target
@@ -75,6 +82,15 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
     public bool showPanelOnClick = true;
     public string panelTitle = "Paragraph";
 
+    [Header("Pagination UI (optional)")]
+    public Button prevPageButton;            // assign if you want a "Previous" button
+    public Button nextPageButton;            // assign if you want a "Next" button
+    public Component pageNumberInput;        // InputField or TMP_InputField
+    public Text pageCountLabel;              // e.g., " / 12"
+    public bool autoRunOnPageChange = true;  // when page changes, re-run pipeline
+
+    public bool loadOnStart = true;
+
     // internals
     Texture2D _tex;
     readonly List<GameObject> _spawned = new();
@@ -94,13 +110,19 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
 
     // prompt row
     RectTransform _promptRowRT;
-    Component _panelPromptText;
+    TMP_InputField _panelPromptTMP;  // TMP input field from prefab
     Button _submitBtn;
 
     // body
-    Component _panelBodyText;
+    Component _panelBodyText;        // will be TMP_Text
     RectTransform _contentRT;
     RectTransform _bodyRT;
+
+    // pagination + pipeline state
+    string _currentUrl = null;
+    int _pageCount = 0;
+    Coroutine _pipelineCo = null;
+    bool _isLoading = false;
 
     void Start()
     {
@@ -109,7 +131,63 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
             Debug.LogError("[CVSeg] Assign pageImage & overlayParent.");
             return;
         }
-        StartCoroutine(RunPipeline());
+
+        // Wire pagination UI if assigned
+        if (prevPageButton) prevPageButton.onClick.AddListener(PrevPage);
+        if (nextPageButton) nextPageButton.onClick.AddListener(NextPage);
+        if (pageNumberInput) UIX.WireOnEndEdit(pageNumberInput, OnPageNumberEntered);
+
+        if (loadOnStart)
+        {
+            _currentUrl = pdfUrl;
+            StartPipeline(true);  // force fresh load
+        }
+    }
+
+    // -------------------- Pagination public API --------------------
+    public void LoadPDF(string url) { LoadPDF(url, 0); }
+
+    public void LoadPDF(string url, int page)
+    {
+        if (string.IsNullOrEmpty(url))
+        {
+            Debug.LogError("[CVSeg] LoadPDF called with empty url.");
+            return;
+        }
+        _currentUrl = url;
+        pageIndex = Mathf.Max(0, page);
+        StartPipeline(true); // (re)download + (re)open doc
+    }
+
+    public void NextPage()
+    {
+        if (_isLoading || _doc == null) return;
+        if (pageIndex >= _pageCount - 1) return;
+        pageIndex++;
+        if (autoRunOnPageChange) StartPipeline(false);
+    }
+
+    public void PrevPage()
+    {
+        if (_isLoading || _doc == null) return;
+        if (pageIndex <= 0) return;
+        pageIndex--;
+        if (autoRunOnPageChange) StartPipeline(false);
+    }
+
+    public void GoToPage(int page)
+    {
+        if (_isLoading || _doc == null) return;
+        int clamped = Mathf.Clamp(page, 0, Mathf.Max(0, _pageCount - 1));
+        if (clamped == pageIndex) return;
+        pageIndex = clamped;
+        if (autoRunOnPageChange) StartPipeline(false);
+    }
+
+    void StartPipeline(bool reloadDoc)
+    {
+        if (_pipelineCo != null) StopCoroutine(_pipelineCo);
+        _pipelineCo = StartCoroutine(RunPipeline(_currentUrl, reloadDoc));
     }
 
     void OnDestroy()
@@ -121,41 +199,67 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
         if (_panelGO) Destroy(_panelGO);
     }
 
-    IEnumerator RunPipeline()
+    // -------------------- Main pipeline --------------------
+    IEnumerator RunPipeline(string runUrl, bool reloadDoc)
     {
-        if (string.IsNullOrEmpty(pdfUrl))
+        if (string.IsNullOrEmpty(runUrl))
         {
             Debug.LogError("[CVSeg] pdfUrl is empty.");
             yield break;
         }
 
-        using var req = UnityWebRequest.Get(pdfUrl);
-        yield return req.SendWebRequest();
+        _isLoading = true;
+
+        // Clear UI that depends on old page
+        HideSidePanel();
+        selectedParagraphText = "";
+        fullText = "";
+        ClearSpawned();
+
+        // Re/open document only if needed
+        bool needNewDoc = reloadDoc || _doc == null || !string.Equals(runUrl, _currentUrl);
+        if (needNewDoc)
+        {
+            // Dispose old doc/page
+            if (_page != null) { _page.Dispose(); _page = null; }
+            if (_doc != null)  { _doc.Dispose();  _doc  = null; }
+
+            using (var req = UnityWebRequest.Get(runUrl))
+            {
+                yield return req.SendWebRequest();
 
 #if UNITY_2020_2_OR_NEWER
-        if (req.result != UnityWebRequest.Result.Success)
+                if (req.result != UnityWebRequest.Result.Success)
 #else
-        if (req.isHttpError || req.isNetworkError)
+                if (req.isHttpError || req.isNetworkError)
 #endif
-        {
-            Debug.LogError($"[CVSeg] Download fail: {req.error}");
-            yield break;
+                {
+                    Debug.LogError($"[CVSeg] Download fail: {req.error}");
+                    _isLoading = false;
+                    yield break;
+                }
+
+                var data = req.downloadHandler.data;
+                _doc = new PDFDocument(data, password);
+                if (!_doc.IsValid)
+                {
+                    Debug.LogError("[CVSeg] Invalid document or wrong password.");
+                    _isLoading = false;
+                    yield break;
+                }
+
+                _currentUrl = runUrl;
+                _pageCount = Mathf.Max(0, _doc.GetPageCount());
+            }
         }
 
-        var data = req.downloadHandler.data;
-
-        _doc = new PDFDocument(data, password);
-        if (!_doc.IsValid)
-        {
-            Debug.LogError("[CVSeg] Invalid document or wrong password.");
-            yield break;
-        }
-
-        int p = Mathf.Clamp(pageIndex, 0, _doc.GetPageCount() - 1);
-        _page = _doc.GetPage(p);
-
+        // Clamp page and open
+        pageIndex = Mathf.Clamp(pageIndex, 0, Mathf.Max(0, _pageCount - 1));
+        if (_page != null) { _page.Dispose(); _page = null; }
+        _page = _doc.GetPage(pageIndex);
         _pagePts = _page.GetPageSize(1f);
 
+        // Decide device rendering W/H
         _devW = Mathf.Max(64, targetWidth);
         _devH = Mathf.RoundToInt(_devW * (_pagePts.y / _pagePts.x));
         if (maxHeight > 0 && _devH > maxHeight)
@@ -164,23 +268,23 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
             _devW = Mathf.RoundToInt(_devH * (_pagePts.x / _pagePts.y));
         }
 
+        // Render page bitmap
         using (var renderer = new PDFRenderer())
         {
             var tex = renderer.RenderPageToTexture(_page, _devW, _devH, null, new PDFRenderer.RenderSettings());
-            if (!tex) { Debug.LogError("[CVSeg] Render failed."); yield break; }
+            if (!tex) { Debug.LogError("[CVSeg] Render failed."); _isLoading = false; yield break; }
             if (_tex) Destroy(_tex);
             _tex = tex;
 
             pageImage.texture = _tex;
-
-            // Do NOT change anchors/pivot on pageImage. Only size it.
             pageImage.rectTransform.sizeDelta = new Vector2(_devW, _devH);
 
-            // Let layout settle, then mirror overlay once; keeps overlayParent centered.
+            // Let layout settle, then mirror overlay once
             yield return AlignOverlayNextFrame();
             AlignOverlayToPage();
         }
 
+        // Detect + merge blocks
         var blocks = DetectParagraphBlocks(_tex);
         blocks = MergeRects(blocks, mergeTolerance);
         blocks = MergeRectsVertically(blocks, extraVerticalMerge);
@@ -188,17 +292,18 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
         float colGap = Mathf.Max(16f, (_devW * columnSplitFrac));
         var columns = Columnize(blocks, colGap);
         foreach (var col in columns)
-            col.Sort((a, b) => a.yMin.CompareTo(b.yMin)); // top→down in device space
+            col.Sort((a, b) => a.yMin.CompareTo(b.yMin)); // device-space top -> down
 
         var ordered = new List<URect>();
         foreach (var col in columns) ordered.AddRange(col);
 
 #if UNITY_WEBGL && !UNITY_EDITOR
         Debug.LogWarning("[CVSeg] Bounded text extraction not available on WebGL runtime. Use OCR in WebGL.");
+        UpdatePaginationUI();   // still update the UI so user sees page info
+        _isLoading = false;
         yield break;
 #else
-        ClearSpawned();
-
+        // Build buttons + extract text
         var paragraphs = new List<string>(ordered.Count);
         using (var textPage = new PDFTextPage(_page))
         {
@@ -226,12 +331,9 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
                 if (string.IsNullOrWhiteSpace(para)) para = "(no text)";
                 paragraphs.Add(para);
 
-                // ----- Create button -----
-                string label = buttonLabelFullParagraph ? para : FirstLine(para, previewLabelChars);
-
-                // Size/position
+                // Button placement
                 float bx = Mathf.Round(r0.xMin);
-                float by = -Mathf.Round(r0.yMin); // top-left anchoring → negative down
+                float by = -Mathf.Round(r0.yMin);
 
                 float bw = buttonsCoverBlocks ? Mathf.Round(r0.width)  : Mathf.Max(minButtonWidth,  r0.width);
                 float bh = buttonsCoverBlocks ? Mathf.Round(r0.height) : Mathf.Max(minButtonHeight, r0.height);
@@ -239,8 +341,9 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
                 var btn = CreateButton(overlayParent, new Vector2(bw, bh), new Vector2(bx, by),
                                        transparentButton ? (new Color(buttonColor.r, buttonColor.g, buttonColor.b, Mathf.Clamp01(buttonColor.a))) : buttonColor);
 
-                // Label & sizing
+                string label = buttonLabelFullParagraph ? para : FirstLine(para, previewLabelChars);
                 SetAnyButtonLabel(btn, label ?? "");
+
                 if (buttonsCoverBlocks)
                 {
                     SizeLabelToFill(btn, bw, bh, labelPadding);
@@ -254,7 +357,6 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
 
                 string captured = para;
                 float capturedH = bh;
-
                 btn.onClick.AddListener(() =>
                 {
                     selectedParagraphText = captured;
@@ -265,10 +367,16 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
                 _spawned.Add(btn.gameObject);
             }
         }
+
         fullText = string.Join("\n\n", paragraphs.Where(s => !string.IsNullOrWhiteSpace(s)));
 
-        // Mirror overlay once more after content builds (avoids a tiny post-build drift).
+        // Mirror once more after building
         AlignOverlayToPage();
+
+        // Update UI (page count, input, buttons)
+        UpdatePaginationUI();
+
+        _isLoading = false;
 #endif
     }
 
@@ -297,11 +405,12 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
         ov.anchoredPosition = img.anchoredPosition;
     }
 
-    // -------------------- Side Panel --------------------
+    // -------------------- Side panel --------------------
     void EnsurePanelBuilt()
     {
         if (_panelGO != null || sidePanelHost == null) return;
 
+        // Root panel
         _panelGO = new GameObject("ParagraphPanel", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
         _panelRT = _panelGO.GetComponent<RectTransform>();
         _panelGO.transform.SetParent(sidePanelHost, false);
@@ -316,7 +425,7 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
         _panelCg.alpha = 0f;
         _panelGO.SetActive(false);
 
-        // Header
+        // ---------- HEADER ----------
         var header = new GameObject("Header", typeof(RectTransform), typeof(Image));
         var hrt = header.GetComponent<RectTransform>();
         header.transform.SetParent(_panelRT, false);
@@ -325,14 +434,20 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
         hrt.anchoredPosition = Vector2.zero;
         header.GetComponent<Image>().color = new Color(0.92f, 0.96f, 1f, 1f);
 
-        // Title (Text or TMP)
-        var titleGO = new GameObject("Title", typeof(RectTransform));
+        // Title
+        var titleGO = new GameObject("Title", typeof(RectTransform), typeof(Text));
         var trt = titleGO.GetComponent<RectTransform>();
         titleGO.transform.SetParent(header.transform, false);
         SetTopLeftAnchors(trt);
         trt.anchoredPosition = new Vector2(12, -8);
         trt.sizeDelta = new Vector2(panelSize.x - 140f, 32f);
-        _panelTitleText = UIX.AddTextOrTMP(titleGO, panelTitle, 20, FontStyle.Bold, TextAnchor.MiddleLeft);
+        var titleText = titleGO.GetComponent<Text>();
+        titleText.text = "Paragraph";
+        titleText.fontSize = 20;
+        titleText.fontStyle = FontStyle.Bold;
+        titleText.alignment = TextAnchor.MiddleLeft;
+        titleText.color = Color.black;
+        _panelTitleText = titleText;
 
         // Copy button
         _copyBtn = UIX.CreateMiniButton(hrt, "Copy", new Vector2(panelSize.x - 128f, -8f), new Vector2(56f, 32f));
@@ -346,14 +461,14 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
         _closeBtn = UIX.CreateMiniButton(hrt, "Close", new Vector2(panelSize.x - 64f, -8f), new Vector2(56f, 32f));
         _closeBtn.onClick.AddListener(() => HideSidePanel());
 
-        // Scroll area
+        // ---------- SCROLL AREA ----------
         var scrollGO = new GameObject("Scroll", typeof(RectTransform), typeof(Image), typeof(Mask), typeof(ScrollRect));
         var srt = scrollGO.GetComponent<RectTransform>();
         scrollGO.transform.SetParent(_panelRT, false);
         SetTopLeftAnchors(srt);
         srt.anchoredPosition = new Vector2(0, -48f);
         srt.sizeDelta = new Vector2(panelSize.x, panelSize.y - 48f);
-        scrollGO.GetComponent<Image>().color = new Color(1, 1, 1, 1);
+        scrollGO.GetComponent<Image>().color = Color.white;
         scrollGO.GetComponent<Mask>().showMaskGraphic = false;
 
         var viewport = new GameObject("Viewport", typeof(RectTransform));
@@ -370,7 +485,7 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
         _contentRT.anchoredPosition = Vector2.zero;
         _contentRT.sizeDelta = new Vector2(panelSize.x - 24f, panelSize.y - 72f);
 
-        // --- Prompt row (container with background) ---
+        // ---------- PROMPT ROW ----------
         var promptRow = new GameObject("PromptRow", typeof(RectTransform), typeof(Image));
         _promptRowRT = promptRow.GetComponent<RectTransform>();
         promptRow.transform.SetParent(_contentRT, false);
@@ -379,29 +494,64 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
         _promptRowRT.sizeDelta = new Vector2(panelSize.x - 48f, 36f);
         promptRow.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.04f);
 
-        // Prompt text (child)
-        var promptTextGO = new GameObject("Prompt", typeof(RectTransform));
-        var prt = promptTextGO.GetComponent<RectTransform>();
-        promptTextGO.transform.SetParent(promptRow.transform, false);
-        SetTopLeftAnchors(prt);
-        prt.anchoredPosition = new Vector2(8f, -6f);
-        prt.sizeDelta = new Vector2(_promptRowRT.sizeDelta.x - 16f - 64f, _promptRowRT.sizeDelta.y - 12f);
-        _panelPromptText = UIX.AddTextOrTMP(promptTextGO, "", 16, FontStyle.Normal, TextAnchor.MiddleLeft);
+        // Prompt (TMP prefab)
+        if (promptFieldPrefab != null)
+        {
+            GameObject promptGO = Instantiate(promptFieldPrefab, promptRow.transform);
+
+            RectTransform prt = promptGO.GetComponent<RectTransform>();
+            if (prt != null)
+            {
+                SetTopLeftAnchors(prt);
+                prt.anchoredPosition = new Vector2(8f, -6f);
+                prt.sizeDelta = new Vector2(
+                    _promptRowRT.sizeDelta.x - 16f - 64f,
+                    _promptRowRT.sizeDelta.y - 12f
+                );
+            }
+
+            _panelPromptTMP = promptGO.GetComponentInChildren<TMP_InputField>(true);
+            if (_panelPromptTMP == null)
+            {
+                Debug.LogError("promptFieldPrefab does NOT contain a TMP_InputField!");
+            }
+            else
+            {
+                _panelPromptTMP.text = "";
+                if (_panelPromptTMP.placeholder != null)
+                {
+                    var p = _panelPromptTMP.placeholder.GetComponent<TMP_Text>();
+                    if (p) p.text = "Type prompt…";
+                }
+            }
+        }
+        else
+        {
+            Debug.LogError("Assign promptFieldPrefab in Inspector!");
+        }
 
         // Submit button
-        _submitBtn = UIX.CreateMiniButton(_promptRowRT, "Submit", new Vector2(_promptRowRT.sizeDelta.x - 60f, -2f), new Vector2(56f, 32f));
+        _submitBtn = UIX.CreateMiniButton(_promptRowRT, "Submit",
+            new Vector2(_promptRowRT.sizeDelta.x - 60f, -2f),
+            new Vector2(56f, 32f));
         _submitBtn.onClick.AddListener(OnSubmitClicked);
 
-        // Body text under prompt
-        var bodyGO = new GameObject("Body", typeof(RectTransform));
+        // ---------- BODY (TMP) ----------
+        var bodyGO = new GameObject("Body", typeof(RectTransform), typeof(TextMeshProUGUI));
         _bodyRT = bodyGO.GetComponent<RectTransform>();
         bodyGO.transform.SetParent(_contentRT, false);
         SetTopLeftAnchors(_bodyRT);
         _bodyRT.anchoredPosition = new Vector2(12f, -12f - _promptRowRT.sizeDelta.y - 8f);
         _bodyRT.sizeDelta = new Vector2(panelSize.x - 48f, panelSize.y - 96f - _promptRowRT.sizeDelta.y);
-        _panelBodyText = UIX.AddTextOrTMP(bodyGO, "", 16, FontStyle.Normal, TextAnchor.UpperLeft);
 
-        // Wire ScrollRect
+        var bodyTMP = bodyGO.GetComponent<TextMeshProUGUI>();
+        bodyTMP.fontSize = 16;
+        bodyTMP.color = Color.black;
+        bodyTMP.alignment = TextAlignmentOptions.TopLeft;
+        bodyTMP.enableWordWrapping = true;
+        _panelBodyText = bodyTMP;
+
+        // ScrollRect wiring
         var scroll = scrollGO.GetComponent<ScrollRect>();
         scroll.viewport = vrt;
         scroll.content = _contentRT;
@@ -416,7 +566,8 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
         if (_panelGO == null) return;
 
         UIX.SetTextOnComponent(_panelTitleText, title ?? panelTitle);
-        UIX.SetTextOnComponent(_panelBodyText, body ?? "");
+        if (_panelBodyText is TMP_Text t) t.text = body ?? "";
+        else UIX.SetTextOnComponent(_panelBodyText, body ?? "");
 
         // autosize body + content
         var preferred = GetPreferredHeight(_panelBodyText, body ?? "", _bodyRT.sizeDelta.x);
@@ -448,22 +599,31 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
 
     void OnSubmitClicked()
     {
-        // Read prompt + visible body
-        string prompt = UIX.GetTextFromComponent(_panelPromptText) ?? "";
+        if (_panelPromptTMP == null)
+        {
+            Debug.LogError("TMP InputField is not assigned / not found in prefab.");
+            return;
+        }
+
+        // Read from TMP input field
+        string prompt = _panelPromptTMP.text ?? "";
+
+        // Read current body (selected paragraph or processed output)
         string bodyNow = UIX.GetTextFromComponent(_panelBodyText) ?? "";
+        string selectedParagraph = bodyNow;
 
         // Build context (prompt + selected paragraph + full page text)
-        string selectedParagraph = bodyNow; // this body is what you showed for the clicked paragraph
         string context =
             "PROMPT:\n" + prompt + "\n\n" +
             "SELECTED PARAGRAPH:\n" + selectedParagraph + "\n\n" +
             "FULL PAGE TEXT (reference):\n" + fullText;
 
-        // TODO: swap this for the real OpenAI call later
+        // TODO: replace with your real OpenAI call later
         string processed = ProcessWithLLM_Placeholder(prompt, selectedParagraph, fullText, context);
 
-        // Write result back to the panel body (or create a separate “Processed” text if you prefer)
-        UIX.SetTextOnComponent(_panelBodyText, processed);
+        // Write result back to the panel body
+        if (_panelBodyText is TMP_Text t) t.text = processed;
+        else UIX.SetTextOnComponent(_panelBodyText, processed);
 
         // Resize after updating text
         var preferred = GetPreferredHeight(_panelBodyText, processed, _bodyRT.sizeDelta.x);
@@ -471,23 +631,87 @@ public class RenderPDFPageWithCVSegmentation : MonoBehaviour
         _contentRT.sizeDelta = new Vector2(_contentRT.sizeDelta.x, preferred + _promptRowRT.sizeDelta.y + 36f);
     }
 
+    [Header("LLM Processor")]
+public OpenAIParagraphProcessor openAIProcessor;
+
+
 string ProcessWithLLM_Placeholder(string prompt, string selectedParagraph, string full, string combinedContext)
 {
-    // Replace with your real OpenAI request later
-    return
-        "[DEMO OUTPUT]\n" +
-        "This is where the LLM answer will go.\n\n" +
-        "Prompt:\n" + prompt + "\n\n" +
-        "We referenced the selected paragraph and (if needed) other parts of the page.";
+    // --- Auto-assign strictly via FindFirstObjectByType ---
+    if (openAIProcessor == null)
+    {
+        // If you want to include inactive objects too, use the overload with the enum in newer Unity:
+        // openAIProcessor = FindFirstObjectByType<OpenAIParagraphProcessor>(FindObjectsInactive.Include);
+        openAIProcessor = FindFirstObjectByType<OpenAIParagraphProcessor>();
+    }
+
+    if (openAIProcessor == null)
+    {
+        return "[Error] OpenAIParagraphProcessor not found in the scene.";
+    }
+
+    // Lock UI during request
+    if (_submitBtn) _submitBtn.interactable = false;
+    if (_panelPromptTMP) _panelPromptTMP.interactable = false;
+
+    // Build corpus from full page text
+    var corpus = new List<string>();
+    if (!string.IsNullOrEmpty(full))
+    {
+        corpus = full
+            .Split(new[] { "\n\n" }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim())
+            .ToList();
+    }
+
+    // Locate selected paragraph index (fallback to 0)
+    int selectedIndex = 0;
+    if (!string.IsNullOrEmpty(selectedParagraph) && corpus.Count > 0)
+    {
+        int idx = corpus.FindIndex(p => string.Equals(p, selectedParagraph, StringComparison.Ordinal));
+        selectedIndex = Mathf.Clamp(idx < 0 ? 0 : idx, 0, Mathf.Max(0, corpus.Count - 1));
+    }
+
+    // Fire async; update panel on completion
+    openAIProcessor.ProcessParagraphWithCorpus(
+        corpus,
+        selectedIndex,
+        prompt ?? string.Empty,
+        onDone: (result) =>
+        {
+            UIX.SetTextOnComponent(_panelBodyText, result ?? "");
+            if (_submitBtn) _submitBtn.interactable = true;
+            if (_panelPromptTMP) _panelPromptTMP.interactable = true;
+
+            if (_bodyRT != null && _panelBodyText != null)
+            {
+                var preferred = GetPreferredHeight(_panelBodyText, result ?? "", _bodyRT.sizeDelta.x);
+                _bodyRT.sizeDelta = new Vector2(_bodyRT.sizeDelta.x, preferred);
+                if (_contentRT != null && _promptRowRT != null)
+                    _contentRT.sizeDelta = new Vector2(_contentRT.sizeDelta.x, preferred + _promptRowRT.sizeDelta.y + 36f);
+            }
+        },
+        onError: (err) =>
+        {
+            UIX.SetTextOnComponent(_panelBodyText, "[Error]\n" + (err ?? "Unknown error"));
+            if (_submitBtn) _submitBtn.interactable = true;
+            if (_panelPromptTMP) _panelPromptTMP.interactable = true;
+
+            if (_bodyRT != null && _panelBodyText != null)
+            {
+                var preferred = GetPreferredHeight(_panelBodyText, UIX.GetTextFromComponent(_panelBodyText), _bodyRT.sizeDelta.x);
+                _bodyRT.sizeDelta = new Vector2(_bodyRT.sizeDelta.x, preferred);
+                if (_contentRT != null && _promptRowRT != null)
+                    _contentRT.sizeDelta = new Vector2(_contentRT.sizeDelta.x, preferred + _promptRowRT.sizeDelta.y + 36f);
+            }
+        }
+    );
+
+    // Immediate status while async runs
+    return "[Processing with LLM…]";
 }
 
 
-
-    string ProcessParagraphWithPrompt(string paragraph, string prompt)
-    {
-        if (string.IsNullOrWhiteSpace(prompt)) return paragraph ?? "";
-        return $"[Prompt]: {prompt}\n\n{paragraph ?? ""}";
-    }
 
     IEnumerator FadePanel(float a, float b, float t, Action onDone = null)
     {
@@ -501,6 +725,39 @@ string ProcessWithLLM_Placeholder(string prompt, string selectedParagraph, strin
         }
         _panelCg.alpha = b;
         onDone?.Invoke();
+    }
+
+    void UpdatePaginationUI()
+    {
+        // Label like " / 12"
+        if (pageCountLabel)
+        {
+            pageCountLabel.text = (_pageCount > 0) ? $" / {_pageCount}" : " / 0";
+        }
+
+        // Fill input with 1-based page number for users
+        if (pageNumberInput)
+        {
+            UIX.SetInputText(pageNumberInput, (_pageCount > 0) ? (pageIndex + 1).ToString() : "0");
+        }
+
+        // Enable/disable prev/next
+        bool canPrev = (_doc != null && pageIndex > 0);
+        bool canNext = (_doc != null && pageIndex < _pageCount - 1);
+
+        if (prevPageButton) prevPageButton.interactable = canPrev && !_isLoading;
+        if (nextPageButton) nextPageButton.interactable = canNext && !_isLoading;
+    }
+
+    void OnPageNumberEntered(string userText)
+    {
+        if (string.IsNullOrWhiteSpace(userText)) return;
+        if (!int.TryParse(userText.Trim(), out var oneBased)) return;
+        if (_pageCount <= 0) return;
+
+        // Convert to 0-based
+        int target = Mathf.Clamp(oneBased - 1, 0, _pageCount - 1);
+        GoToPage(target);
     }
 
     // -------------------- CV segmentation --------------------
@@ -1025,10 +1282,8 @@ static class UIX
             var fontAssetType = Type.GetType("TMPro.TMP_FontAsset, Unity.TextMeshPro");
             if (settingsType != null && fontAssetType != null)
             {
-              var defProp = settingsType.GetProperty("defaultFontAsset", BindingFlags.Public | BindingFlags.Static);
-// ✅ correct:
-var def = defProp != null ? defProp.GetValue(null, null) : null;
-
+                var defProp = settingsType.GetProperty("defaultFontAsset", BindingFlags.Public | BindingFlags.Static);
+                var def = defProp != null ? defProp.GetValue(null, null) : null;
 
                 if (def != null && fontAssetType.IsInstanceOfType(def))
                 {
@@ -1039,6 +1294,66 @@ var def = defProp != null ? defProp.GetValue(null, null) : null;
             }
         }
         catch { }
+    }
+
+    // ===== Input helpers (support both legacy InputField and TMP_InputField) =====
+    public static void SetInputText(Component input, string value)
+    {
+        if (!input) return;
+
+        var t = input.GetType();
+        // UnityEngine.UI.InputField
+        if (t == typeof(UnityEngine.UI.InputField))
+        {
+            var f = input as UnityEngine.UI.InputField;
+            f.text = value ?? "";
+            return;
+        }
+
+        // TMPro.TMP_InputField (by reflection to avoid hard dependency here)
+        var tmpType = Type.GetType("TMPro.TMP_InputField, Unity.TextMeshPro");
+        if (tmpType != null && tmpType.IsInstanceOfType(input))
+        {
+            var prop = tmpType.GetProperty("text", BindingFlags.Public | BindingFlags.Instance);
+            prop?.SetValue(input, value ?? "", null);
+            return;
+        }
+    }
+
+    public static void WireOnEndEdit(Component input, Action<string> onEndEdit)
+    {
+        if (!input || onEndEdit == null) return;
+
+        var t = input.GetType();
+        // UnityEngine.UI.InputField
+        if (t == typeof(UnityEngine.UI.InputField))
+        {
+            var f = input as UnityEngine.UI.InputField;
+            f.onEndEdit.RemoveAllListeners();
+            f.onEndEdit.AddListener(onEndEdit.Invoke);
+            return;
+        }
+
+        // TMPro.TMP_InputField
+        var tmpType = Type.GetType("TMPro.TMP_InputField, Unity.TextMeshPro");
+        if (tmpType != null && tmpType.IsInstanceOfType(input))
+        {
+            var evtProp = tmpType.GetProperty("onEndEdit", BindingFlags.Public | BindingFlags.Instance);
+            var unityEventBase = evtProp?.GetValue(input, null);
+            if (unityEventBase != null)
+            {
+                // onEndEdit is TMP_InputField.SubmitEvent (UnityEvent<string>)
+                var removeAll = unityEventBase.GetType().GetMethod("RemoveAllListeners");
+                removeAll?.Invoke(unityEventBase, null);
+
+                var addListener = unityEventBase.GetType().GetMethod("AddListener");
+                if (addListener != null)
+                {
+                    UnityEngine.Events.UnityAction<string> act = (s) => onEndEdit.Invoke(s);
+                    addListener.Invoke(unityEventBase, new object[] { act });
+                }
+            }
+        }
     }
 
     // Geometry helpers

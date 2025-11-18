@@ -63,15 +63,15 @@ public class LuaPromptUI : MonoBehaviour
     private void StartGeneration()
     {
 
-        currentTarget= pwm.selectedObject;
+        currentTarget = pwm.selectedObject;
 
         if (!generator)
         {
             UpdateStatus("Generator missing in scene.");
             return;
         }
-        
-        
+
+
         if (!currentTarget)
         {
             UpdateStatus("Pick a target first.");
@@ -80,12 +80,21 @@ public class LuaPromptUI : MonoBehaviour
         else
         {
 
-        UpdateStatus("Current target: " + currentTarget.name  );
-            
+            UpdateStatus("Current target: " + currentTarget.name);
+
+        }
+
+        var objectTag = "";
+
+
+        if (currentTarget.GetComponent<ProgramableObject>().isRealObject)
+        {
+            objectTag = "[This is a realobject] ";
+
         }
 
         // Apply UI -> generator
-        if (promptInput)      generator.naturalLanguageIntent = promptInput.text;
+        if (promptInput) generator.naturalLanguageIntent = objectTag+promptInput.text;
         if (objectNameInput)  generator.objectDisplayName     = objectNameInput.text;
 
         if (modelDropdown && modelDropdown.options.Count > 0)

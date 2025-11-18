@@ -1,0 +1,177 @@
+fileFormatVersion: 2
+guid: 581489f787a3b224f87c498899216499
+ModelImporter:
+  serializedVersion: 23
+  fileIDToRecycleName:
+    100000: Left_Lace
+    100002: //RootNode
+    100004: Left_Shoe_Border
+    100006: Left_Shoe_Bottom_Low
+    100008: Left_Shoe_front_Low
+    100010: Left_shoe_soft_Low
+    100012: Left_Shoe_top_High
+    100014: Left_Show_inner
+    400000: Left_Lace
+    400002: //RootNode
+    400004: Left_Shoe_Border
+    400006: Left_Shoe_Bottom_Low
+    400008: Left_Shoe_front_Low
+    400010: Left_shoe_soft_Low
+    400012: Left_Shoe_top_High
+    400014: Left_Show_inner
+    2100000: Lace_M
+    2100002: Shoe_Border_M
+    2100004: Sh_Low_Shoe_Bottom_M
+    2100006: Shoe_Front_M1
+    2100008: Shoe_Soft_M1
+    2100010: Shoe_Top_M
+    2100012: Show_inner_M
+    2300000: Left_Lace
+    2300002: Left_Shoe_Border
+    2300004: Left_Shoe_Bottom_Low
+    2300006: Left_Shoe_front_Low
+    2300008: Left_shoe_soft_Low
+    2300010: Left_Shoe_top_High
+    2300012: Left_Show_inner
+    3300000: Left_Lace
+    3300002: Left_Shoe_Border
+    3300004: Left_Shoe_Bottom_Low
+    3300006: Left_Shoe_front_Low
+    3300008: Left_shoe_soft_Low
+    3300010: Left_Shoe_top_High
+    3300012: Left_Show_inner
+    4300000: Left_Lace
+    4300002: Left_Shoe_Border
+    4300004: Left_Shoe_Bottom_Low
+    4300006: Left_Shoe_front_Low
+    4300008: Left_shoe_soft_Low
+    4300010: Left_Shoe_top_High
+    4300012: Left_Show_inner
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Lace_M
+    second: {fileID: 2100000, guid: a0b1bf45f1bbe544f80f41087b9e01a2, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Sh_Low_Shoe_Bottom_M
+    second: {fileID: 2100000, guid: 4e1e1602c2da08f4f8f65da7641b3a3c, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Shoe_Border_M
+    second: {fileID: 2100000, guid: a2b34b27c6e4c2a49914d89397709d95, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Shoe_Front_M1
+    second: {fileID: 2100000, guid: cd9d76536fb84b64c883c9bdd292f0ff, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Shoe_Soft_M1
+    second: {fileID: 2100000, guid: c8728643602c9df4e90c73b6f0b228d3, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Shoe_Top_M
+    second: {fileID: 2100000, guid: 07c7f2c2f2526094bb409a5c1c23fdd9, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Show_inner_M
+    second: {fileID: 2100000, guid: 44b98733372220a49b3a7cb9f92c851d, type: 2}
+  materials:
+    importMaterials: 1
+    materialName: 0
+    materialSearch: 1
+    materialLocation: 1
+  animations:
+    legacyGenerateAnimations: 4
+    bakeSimulation: 0
+    resampleCurves: 1
+    optimizeGameObjects: 0
+    motionNodeName: 
+    rigImportErrors: 
+    rigImportWarnings: 
+    animationImportErrors: 
+    animationImportWarnings: 
+    animationRetargetingWarnings: 
+    animationDoRetargetingWarnings: 0
+    importAnimatedCustomProperties: 0
+    importConstraints: 0
+    animationCompression: 1
+    animationRotationError: 0.5
+    animationPositionError: 0.5
+    animationScaleError: 0.5
+    animationWrapMode: 0
+    extraExposedTransformPaths: []
+    extraUserProperties: []
+    clipAnimations: []
+    isReadable: 1
+  meshes:
+    lODScreenPercentages: []
+    globalScale: 1
+    meshCompression: 0
+    addColliders: 0
+    useSRGBMaterialColor: 1
+    importVisibility: 1
+    importBlendShapes: 1
+    importCameras: 1
+    importLights: 1
+    swapUVChannels: 0
+    generateSecondaryUV: 1
+    useFileUnits: 1
+    optimizeMeshForGPU: 1
+    keepQuads: 0
+    weldVertices: 1
+    preserveHierarchy: 0
+    indexFormat: 0
+    secondaryUVAngleDistortion: 8
+    secondaryUVAreaDistortion: 15
+    secondaryUVHardAngle: 88
+    secondaryUVPackMargin: 18
+    useFileScale: 1
+    previousCalculatedGlobalScale: 1
+    hasPreviousCalculatedGlobalScale: 0
+  tangentSpace:
+    normalSmoothAngle: 60
+    normalImportMode: 0
+    tangentImportMode: 3
+    normalCalculationMode: 4
+    legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 0
+    blendShapeNormalImportMode: 1
+    normalSmoothingSource: 0
+  importAnimation: 1
+  copyAvatar: 0
+  humanDescription:
+    serializedVersion: 2
+    human: []
+    skeleton: []
+    armTwist: 0.5
+    foreArmTwist: 0.5
+    upperLegTwist: 0.5
+    legTwist: 0.5
+    armStretch: 0.05
+    legStretch: 0.05
+    feetSpacing: 0
+    rootMotionBoneName: 
+    hasTranslationDoF: 0
+    hasExtraRoot: 0
+    skeletonHasParents: 1
+  lastHumanDescriptionAvatarSource: {instanceID: 0}
+  animationType: 0
+  humanoidOversampling: 1
+  additionalBone: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 147001
+  packageName: Human_Anatomy_HDRP
+  packageVersion: 1.0
+  assetPath: Assets/Human_Anatomy_HDRP/Art/clothing/Shoe/Left_Shoe.fbx
+  uploadId: 315629

@@ -1,0 +1,241 @@
+fileFormatVersion: 2
+guid: 72334fd0db82e73479cee22ad91b36d4
+ModelImporter:
+  serializedVersion: 23
+  fileIDToRecycleName:
+    100000: Anterior_tibial_Artery
+    100002: //RootNode
+    100004: Auxillary_vein
+    100006: axiillary_artery
+    100008: Brachial_arteries
+    100010: Brachial_artery
+    100012: Deep_Fomaral_Artery
+    100014: Descending_aorta
+    100016: eternal_iliac_Artery
+    100018: External_Carotid_Artery
+    100020: External_ilaic_Artery
+    100022: Femoral_Artery
+    100024: Internal_Carotid_Artery
+    100026: L_Axillary_Artery
+    100028: Lateral_Circumflex_Femoral_Artery
+    100030: Popliteal_Vein
+    100032: Posterior_ilaic_Artery
+    100034: Pulmnary_arteries
+    100036: R_Axillary_Artery
+    100038: Radial_arteries
+    100040: Radial_artery
+    100042: Renal_Artery_Left
+    100044: Renal_Artery_Right
+    100046: Subclavian_arteries
+    100048: Subclavian_artery
+    100050: Veins_lying:Loft272
+    100052: Veins_lying:Loft273
+    100054: Veins_lying:Loft274
+    400000: Anterior_tibial_Artery
+    400002: //RootNode
+    400004: Auxillary_vein
+    400006: axiillary_artery
+    400008: Brachial_arteries
+    400010: Brachial_artery
+    400012: Deep_Fomaral_Artery
+    400014: Descending_aorta
+    400016: eternal_iliac_Artery
+    400018: External_Carotid_Artery
+    400020: External_ilaic_Artery
+    400022: Femoral_Artery
+    400024: Internal_Carotid_Artery
+    400026: L_Axillary_Artery
+    400028: Lateral_Circumflex_Femoral_Artery
+    400030: Popliteal_Vein
+    400032: Posterior_ilaic_Artery
+    400034: Pulmnary_arteries
+    400036: R_Axillary_Artery
+    400038: Radial_arteries
+    400040: Radial_artery
+    400042: Renal_Artery_Left
+    400044: Renal_Artery_Right
+    400046: Subclavian_arteries
+    400048: Subclavian_artery
+    400050: Veins_lying:Loft272
+    400052: Veins_lying:Loft273
+    400054: Veins_lying:Loft274
+    2100000: Artery_M
+    2300000: Anterior_tibial_Artery
+    2300002: Auxillary_vein
+    2300004: axiillary_artery
+    2300006: Brachial_arteries
+    2300008: Brachial_artery
+    2300010: Deep_Fomaral_Artery
+    2300012: Descending_aorta
+    2300014: eternal_iliac_Artery
+    2300016: External_Carotid_Artery
+    2300018: External_ilaic_Artery
+    2300020: Femoral_Artery
+    2300022: Internal_Carotid_Artery
+    2300024: L_Axillary_Artery
+    2300026: Lateral_Circumflex_Femoral_Artery
+    2300028: Popliteal_Vein
+    2300030: Posterior_ilaic_Artery
+    2300032: Pulmnary_arteries
+    2300034: R_Axillary_Artery
+    2300036: Radial_arteries
+    2300038: Radial_artery
+    2300040: Renal_Artery_Left
+    2300042: Renal_Artery_Right
+    2300044: Subclavian_arteries
+    2300046: Subclavian_artery
+    2300048: Veins_lying:Loft272
+    2300050: Veins_lying:Loft273
+    2300052: Veins_lying:Loft274
+    3300000: Anterior_tibial_Artery
+    3300002: Auxillary_vein
+    3300004: axiillary_artery
+    3300006: Brachial_arteries
+    3300008: Brachial_artery
+    3300010: Deep_Fomaral_Artery
+    3300012: Descending_aorta
+    3300014: eternal_iliac_Artery
+    3300016: External_Carotid_Artery
+    3300018: External_ilaic_Artery
+    3300020: Femoral_Artery
+    3300022: Internal_Carotid_Artery
+    3300024: L_Axillary_Artery
+    3300026: Lateral_Circumflex_Femoral_Artery
+    3300028: Popliteal_Vein
+    3300030: Posterior_ilaic_Artery
+    3300032: Pulmnary_arteries
+    3300034: R_Axillary_Artery
+    3300036: Radial_arteries
+    3300038: Radial_artery
+    3300040: Renal_Artery_Left
+    3300042: Renal_Artery_Right
+    3300044: Subclavian_arteries
+    3300046: Subclavian_artery
+    3300048: Veins_lying:Loft272
+    3300050: Veins_lying:Loft273
+    3300052: Veins_lying:Loft274
+    4300000: External_ilaic_Artery
+    4300002: Femoral_Artery
+    4300004: Popliteal_Vein
+    4300006: Lateral_Circumflex_Femoral_Artery
+    4300008: Deep_Fomaral_Artery
+    4300010: R_Axillary_Artery
+    4300012: Subclavian_artery
+    4300014: Brachial_artery
+    4300016: Radial_artery
+    4300018: Auxillary_vein
+    4300020: Anterior_tibial_Artery
+    4300022: Descending_aorta
+    4300024: Brachial_arteries
+    4300026: L_Axillary_Artery
+    4300028: axiillary_artery
+    4300030: Radial_arteries
+    4300032: Subclavian_arteries
+    4300034: Internal_Carotid_Artery
+    4300036: External_Carotid_Artery
+    4300038: Veins_lying:Loft272
+    4300040: Veins_lying:Loft273
+    4300042: Veins_lying:Loft274
+    4300044: Renal_Artery_Left
+    4300046: Renal_Artery_Right
+    4300048: eternal_iliac_Artery
+    4300050: Posterior_ilaic_Artery
+    4300052: Pulmnary_arteries
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Artery_M
+    second: {fileID: 2100000, guid: 3381afca9a9c12e47bcc4811a5e1ac19, type: 2}
+  materials:
+    importMaterials: 1
+    materialName: 0
+    materialSearch: 1
+    materialLocation: 1
+  animations:
+    legacyGenerateAnimations: 4
+    bakeSimulation: 0
+    resampleCurves: 1
+    optimizeGameObjects: 0
+    motionNodeName: 
+    rigImportErrors: 
+    rigImportWarnings: 
+    animationImportErrors: 
+    animationImportWarnings: 
+    animationRetargetingWarnings: 
+    animationDoRetargetingWarnings: 0
+    importAnimatedCustomProperties: 0
+    importConstraints: 0
+    animationCompression: 1
+    animationRotationError: 0.5
+    animationPositionError: 0.5
+    animationScaleError: 0.5
+    animationWrapMode: 0
+    extraExposedTransformPaths: []
+    extraUserProperties: []
+    clipAnimations: []
+    isReadable: 1
+  meshes:
+    lODScreenPercentages: []
+    globalScale: 1
+    meshCompression: 0
+    addColliders: 0
+    useSRGBMaterialColor: 1
+    importVisibility: 1
+    importBlendShapes: 1
+    importCameras: 1
+    importLights: 1
+    swapUVChannels: 0
+    generateSecondaryUV: 1
+    useFileUnits: 1
+    optimizeMeshForGPU: 1
+    keepQuads: 0
+    weldVertices: 1
+    preserveHierarchy: 0
+    indexFormat: 0
+    secondaryUVAngleDistortion: 8
+    secondaryUVAreaDistortion: 15
+    secondaryUVHardAngle: 180
+    secondaryUVPackMargin: 18
+    useFileScale: 1
+    previousCalculatedGlobalScale: 1
+    hasPreviousCalculatedGlobalScale: 0
+  tangentSpace:
+    normalSmoothAngle: 60
+    normalImportMode: 0
+    tangentImportMode: 3
+    normalCalculationMode: 4
+    legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 0
+    blendShapeNormalImportMode: 1
+    normalSmoothingSource: 0
+  importAnimation: 1
+  copyAvatar: 0
+  humanDescription:
+    serializedVersion: 2
+    human: []
+    skeleton: []
+    armTwist: 0.5
+    foreArmTwist: 0.5
+    upperLegTwist: 0.5
+    legTwist: 0.5
+    armStretch: 0.05
+    legStretch: 0.05
+    feetSpacing: 0
+    rootMotionBoneName: 
+    hasTranslationDoF: 0
+    hasExtraRoot: 0
+    skeletonHasParents: 1
+  lastHumanDescriptionAvatarSource: {instanceID: 0}
+  animationType: 0
+  humanoidOversampling: 1
+  additionalBone: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 147001
+  packageName: Human_Anatomy_HDRP
+  packageVersion: 1.0
+  assetPath: Assets/Human_Anatomy_HDRP/Art/Human_Anatomy_Models/circulatry_system/Artery.fbx
+  uploadId: 315629

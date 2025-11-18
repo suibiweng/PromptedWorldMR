@@ -83,20 +83,6 @@ ParticleSystemProxy  (self.particles / self.particleSystem)
 - IsAlive() -> bool
 - SetLooping(bool)
 
-AudioSourceProxy  (self.audio / self.audioSource)
-- Play()
-- Stop()
-- Pause()
-- SetVolume(number 0..1)
-- SetLoop(bool)
-
-AnimatorProxy  (self.animator)
-- Play(stateName)
-- SetTrigger(name)
-- SetBool(name, bool)
-- SetFloat(name, number)
-- SetInt(name, int)
-
 ProgramableObjectProxy  (self.programable / self.programmable / self.programableObject)
 Identity/flags:
 - GetId() -> string
@@ -215,4 +201,197 @@ end
 function on_trigger(self, other) end   -- NOT used for proximity "touch"
 function on_collision(self, col) end   -- NOT used for proximity "touch"
 function on_stop(self) end
+
+
++### LABEL COMMUNICATION (STRICT, NO INTENT VARIABLES)
+
+-Goal: when the user prompt includes “say …” or “show …”, the generated Lua MUST update the on-object label via ProgramableObjectProxy:SetLabel(text). Do NOT use Transform for text. Do NOT spam SetLabel every frame—throttle live readouts.
++Principle: For simple label requests, generate direct behavior only. Do **not** create variables like `intent`, `lastIntent`, or any state machine unless the user explicitly asks for multi-mode switching.
+
+ Authoritative API:
+ - ProgramableObjectProxy:SetLabel(text)  (use this, not Transform)   [MUST]
+ - ProgramableObjectProxy:GetId()                                           [MAY]
+ - ProgramableObjectProxy:GetIsTouching(), GetIsSelected(), GetIsHovering() [MAY]
+ - RigidbodyProxy:GetVelocity() -> {x,y,z}                                  [MAY]
+ 
+-INTENT GRAMMAR
+-- “say <free text>” → set label to that text (one-shot; update when intent changes).
+-- “say” (no text) → clear the label (“”).
+-- “show speed” → label shows speed in m/s from RigidbodyProxy magnitude.
+-- “show position” → label shows transform.position as (x,y,z) with 3 decimals.
+-- “show touch” → label shows “Touching” or “Not touching” (+ distance if available).
+-- “show id” → label shows “ID: <string>”.
+-- You MAY add safe, obvious variants (“show velocity”, “show pos”) mapping to the above.
++MAPPING (plain English)
++- “say <free text>” → set label to that text **once at initialization** (one-shot).
++- “say” (no text) → clear the label (“”) **once**.
++- “show speed” → label shows speed in m/s from RigidbodyProxy magnitude, updated in `update` with throttling (~4 Hz).
++- “show position” → label shows transform.position as (x,y,z) with 3 decimals, updated in `update` with throttling.
++- “show touch” → label shows “Touching” / “Not touching” (+ distance if available), updated in `update` with throttling.
++- “show id” → label shows “ID: <string>” **once**, using `ProgramableObjectProxy:GetId()` if available; otherwise `self.transform.name`.
++- You MAY add safe variants (“show velocity”, “show pos”) mapping to the above.
+ 
+-REQUIRED PATTERN (pasteable scaffold)
+-
+-```lua
+--- locals at top-level persist across frames
+-local intent = intent or "say hello"   -- allow LLM/C# to overwrite
+-local lastIntent = nil
+-local t = 0.0
+-local interval = 0.25   -- throttle live updates (≈4 Hz)
+-
+-function SetIntent(newIntent)  -- optional helper callable from C#
+-  if type(newIntent) == "string" then intent = newIntent end
+-end
+-
+-local function vec3_mag(v) if not v then return 0 end
+-  local x,y,z = v.x or 0, v.y or 0, v.z or 0
+-  return math.sqrt(x*x + y*y + z*z)
+-end
+-
+-local function set_label(po, text) if po and text ~= nil then po:SetLabel(text) end end
+-
+-local function apply_say(po, text)
+-  set_label(po, text or "")
+-end
+-
+-local function apply_show(po, self)
+-  -- called only when throttled window opens
+-  local lower = (intent or ""):lower()
+-  if lower == "show speed" then
+-    local v = (self.rigidbody and self.rigidbody.GetVelocity) and self.rigidbody:GetVelocity() or nil
+-    set_label(po, string.format("Speed: %.3f m/s", vec3_mag(v)))
+-  elseif lower == "show position" then
+-    local p = self.transform.position
+-    set_label(po, string.format("Position: (%.3f, %.3f, %.3f)", p.x, p.y, p.z))
+-  elseif lower == "show touch" then
+-    local touching = po:GetIsTouching()
+-    local d = po.GetTouchDistance and po:GetTouchDistance() or nil
+-    if touching then
+-      if d then set_label(po, string.format("Touching (%.3fm)", d)) else set_label(po, "Touching") end
+-    else
+-      set_label(po, "Not touching")
+-    end
+-  elseif lower == "show id" then
+-    local id = po.GetId and po:GetId() or "(no id)"
+-    set_label(po, "ID: " . tostring(id))
+-  end
+-end
+-
+-function start(self)
+-  local po = self.programable or self.programmable or self.programableObject
+-  if not po then return end
+-  local lower = (intent or ""):lower()
+-  if lower:sub(1,4) == "say " then
+-    apply_say(po, intent:sub(5))  -- one-shot on start
+-  elseif lower == "say" then
+-    apply_say(po, "")
+-  end
+-  lastIntent = intent
+-end
+-
+-function update(self, dt)
+-  local po = self.programable or self.programmable or self.programableObject
+-  if not po then return end
+-
+-  -- Emit immediately on intent change
+-  if intent ~= lastIntent then
+-    local lower = (intent or ""):lower()
+-    if lower:sub(1,4) == "say " then
+-      apply_say(po, intent:sub(5))
+-    elseif lower == "say" then
+-      apply_say(po, "")
+-    end
+-    lastIntent = intent
+-    t = 0 -- reset throttle so next frame can show fresh live data if needed
+-  end
+-
+-  -- Live “show …” readouts (throttled)
+-  local lower = (intent or ""):lower()
+-  if lower:sub(1,5) == "show " then
+-    t = t + dt
+-    if t >= interval then
+-      t = 0
+-      apply_show(po, self)
+-    end
+-  end
+-end
+-
+-function on_trigger(self, other) end
+-function on_collision(self, col) end
+-function on_stop(self) end
+-```
++REQUIRED PATTERNS (no intent/state)
++- Declarative info (“say…”, “tell me…”, “show me your name”, “what is…”, “display …”):
++  - Call `ProgramableObject:SetLabel(...)` **once in `start`**. Do not gate on events. Do not update every frame.
++- Live readouts (“show speed/position/touch/velocity”):
++  - Update in `update` with a small throttle (~4 Hz). No intent/state variables—only a local throttle timer if needed.
++- Event-gated (only if explicitly requested: “when I touch…/on trigger/ on collision”):
++  - Put the label call in the specified handler; otherwise don’t gate.
+@@
+-### LABEL INTENT MAPPING (NO TOUCH BY DEFAULT)
++### LABEL MAPPING (NO TOUCH BY DEFAULT, NO INTENT VARIABLES)
+ 
+ Interpreting user phrasing:
+-- Declarative info requests → update label immediately (no gating):
+-  Phrases: "show me …", "display …", "tell me …", "what is …", "say …"
+-  Implementation: set ProgramableObject:SetLabel(…) once in start (and again when the intent changes). DO NOT put SetLabel in on_trigger/on_collision unless explicitly asked.
++- Declarative info requests → update label immediately (no gating):
++  Phrases: "show me …", "display …", "tell me …", "what is …", "say …"
++  Implementation: set ProgramableObject:SetLabel(…) **once in `start`**. DO NOT put SetLabel in on_trigger/on_collision unless explicitly asked.
+ 
+ - Event-gated requests → update only on the specified event:
+   Phrases with explicit conditions: "when I touch", "on touch", "on trigger", "on collision", "when near", "if grabbed", etc.
+   Implementation: place the effect in the corresponding handler (on_trigger/on_collision/…).
+ 
+ Name/ID policy:
+ - Preferred: if ProgramableObjectProxy has GetId() or GetName(), use that.
+ - Otherwise fall back to self.transform.name.
+ - Format: "My name is <name>".
+ 
+ Anti-patterns (must NOT do):
+ - Don’t use on_trigger/on_collision for “show/tell/say” unless the prompt explicitly names an event.
+-- Don’t spam SetLabel every frame for one-shot info; set it once in start or on intent change.
++- Don’t spam SetLabel every frame for one-shot info; set it once in `start`.
+
+
+### PRONOUN & TONE REWRITE FOR LABELS (MANDATORY)
+
+Goal: When a user addresses the object with first-person language (e.g., "tell me …", "say that I'm …"), the label should speak back to the user in second person ("you"), not mirror the user's words.
+
+Rewrite rules:
+- First person → second person for the user:
+  - "me" → "you"
+  - "I am" / "I'm" → "you are"
+  - "my" → "your"
+- Keep the rest of the phrase intact; fix simple casing ("i'm" → "I'm") before rewriting.
+- Use plain ASCII quotes (no smart quotes). Keep punctuation simple; end with a period unless the prompt clearly implies a question mark.
+
+Examples (apply once in `start`, not event-gated):
+- "tell me i'm pretty"  → SetLabel("You are pretty.")
+- "tell me I am fast"   → SetLabel("You are fast.")
+- "say that I'm awesome"→ SetLabel("You are awesome.")
+- "tell me your name"   → SetLabel("My name is <name>.")  // name/ID follows existing policy
+
+Do NOT:
+- Do not echo first-person back to the user (avoid "I am pretty" or "Tell me I'm pretty").
+- Do not introduce state variables (no `intent`, no `lastIntent`) unless explicitly requested.
+- Do not spam SetLabel every frame for these one-shot phrases.
+
+
+OUTPUT FORMAT (STRICT)
+
+- Return ONLY runnable Lua source.
+- Do NOT include Markdown fences or backticks.
+- Do NOT include JSON, YAML, XML, or prose/explanations—just Lua code.
+- Comments must be Lua line comments using -- only (keep them minimal).
+- Do NOT use require, io, os, package, debug, or any file/network APIs.
+- Do NOT call GetComponent/AddComponent/GetComponentInChildren/GetComponentInParent.
+- Use only the proxies/APIs defined in this spec.
+- Define functions from this set only: start(self), update(self, dt), on_trigger(self, other), - - on_collision(self, col), on_stop(self). Omit handlers you don’t use.
+- No global prints/logging unless explicitly requested.
+- Use plain ASCII quotes and identifiers (no smart quotes). UTF-8 encoding, no BOM.
+- Avoid trailing commas and stray characters.
+
+
 

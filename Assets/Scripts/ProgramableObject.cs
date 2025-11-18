@@ -261,7 +261,7 @@ public class ProgramableObject : MonoBehaviour
         // Keep your existing selection behavior
         if (promptedWorldManager != null)
         {
-            promptedWorldManager.selectedObject = this.gameObject;
+            promptedWorldManager.setSelectedObject(this.gameObject) ;
          //   FindAnyObjectByType<OpenAILuaGenerator>().AssignTarget(promptedWorldManager.selectedObject);
         }
 
@@ -269,7 +269,7 @@ public class ProgramableObject : MonoBehaviour
         // if (TryGetComponent<LuaBehaviour>(out var lua)) lua.Trigger();
     }
 
-    protected virtual void OnSelectExit()
+     protected virtual void OnSelectExit()
     {
         // Custom code on select exit
     }

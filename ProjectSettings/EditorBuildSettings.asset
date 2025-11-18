@@ -6,35 +6,20 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/MRUKSamples/QRCodeDetection/QRCodeDetection.unity
-    guid: 8b94352aa29d6894d8e73966f3ee47d0
+    path: Assets/Scenes/LassoMR.unity
+    guid: c5965009bb8304b9b858d2ad73a5f77d
   - enabled: 1
-    path: Assets/Scenes/PromptedMatter.unity
-    guid: 6c7fdc9f0826e4e4e942b834aa671a20
-  - enabled: 1
-    path: Assets/Scenes/ArUcoMarkerTracking.unity
-    guid: 42cb89ae9cffec24c8d1e5a4876b74a7
-  - enabled: 1
-    path: Assets/Scenes/RayCastCam.unity
-    guid: f41f49e3f31080c4a9a951457a15c47e
-  - enabled: 1
-    path: Assets/Scenes/RayCastSelector.unity
-    guid: c1a3f01d87045b047ad6fc948bf425e9
-  - enabled: 1
-    path: Assets/MRUKSamples/Experimental/EnvironmentPanelPlacement/EnvironmentPanelPlacement.unity
-    guid: 01a2198db44a25d44a3108875f7fd3d5
-  - enabled: 1
-    path: Assets/Scenes/Main.unity
-    guid: 4177cb7b0d7d1884d8066ee2f04db555
-  - enabled: 1
-    path: Assets/TinyTeachable/Scenes/TinyTMMR.unity
-    guid: a6cd776127f594429affd77cc5844db3
+    path: Assets/Scenes/MedTronic_Demo.unity
+    guid: 649862530cf42483e9bc1de6311f933a
   - enabled: 1
     path: Assets/Scenes/WorkSpace.unity
     guid: 4dcfd7317b371c24dbcce2b5b3931ffc
   - enabled: 1
-    path: Assets/Scenes/PromptedMatterTest.unity
-    guid: 9f6dc9346e40ed44a84dc097935be5a9
+    path: Assets/Scenes/PaperSummrize.unity
+    guid: c8defbc90737d42e4af6106c15eab500
+  - enabled: 1
+    path: Assets/DepthAPISample/Scenes/DepthMask.unity
+    guid: db29fe902890dd34daa569de2dea3734
   m_configObjects:
     Unity.XR.Oculus.Settings: {fileID: 11400000, guid: 136951f51e53ba84ba411da0d4ed8359, type: 2}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 59d30aca7726c4746a47e67d4c1a67e9, type: 2}

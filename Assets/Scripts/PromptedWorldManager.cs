@@ -2,19 +2,35 @@ using UnityEngine;
 using PromptedWorld;
 using System;
 using System.Collections.Generic;
+using Meta.XR.MRUtilityKit;
+using System.Collections;
 
 [DisallowMultipleComponent]
 [DefaultExecutionOrder(-100)]
 public class PromptedWorldManager : MonoBehaviour
 {
+
+    // --- Add these fields near your other fields ---
+[Header("Create Shape Debounce")]
+[Tooltip("Minimum time between CreateShape calls (seconds) to ignore double-clicks / duplicate events.")]
+public float createCooldown = 0.25f;
+private float _lastCreateTime = -999f;
+
+
+
+
+
     [Header("User Anchors")]
     public Transform userHead;
     public Transform userLeftHand;
     public Transform userRightHand;
 
+    public Transform spawnPoint;
+
     [Header("Spawning / Prefabs")]
     [Tooltip("Prefab that contains a ProgramableObject component.")]
     public GameObject ProgramableObjectPrefab;
+    public GameObject ProgramableRealobjectPrefab;
 
     [Header("Selection")]
     public GameObject selectedObject;
@@ -35,9 +51,9 @@ public class PromptedWorldManager : MonoBehaviour
     public event Action<ProgramableObject, bool> OnReclassified;
 
     // --- Internals ---
-    private readonly List<ProgramableObject> _realObjects = new();
-    private readonly List<ProgramableObject> _virtualObjects = new();
-    private readonly HashSet<ProgramableObject> _all = new();
+    public List<ProgramableObject> _realObjects = new();
+    public  List<ProgramableObject> _virtualObjects = new();
+    public  HashSet<ProgramableObject> _all = new();
     private readonly Dictionary<string, ProgramableObject> _byId = new();
     private readonly Dictionary<GameObject, ProgramableObject> _trackedMap = new();
 
@@ -45,14 +61,82 @@ public class PromptedWorldManager : MonoBehaviour
     private void Awake()
     {
         Rebuild();               // catch pre-existing ProgramableObjects
-        RefreshTrackedObjects(); // wrap TrackedObject-tagged objects
+       // RefreshTrackedObjects(); // wrap TrackedObject-tagged objects
     }
 
     private void Update()
     {
-        if (keepUpdatedEachFrame)
-            RefreshTrackedObjects();
+        //  if (keepUpdatedEachFrame)
+        //  RefreshTrackedObjects();
     }
+
+
+    // --- NEW: call this from your UI Button instead of CreateShape directly ---
+public void CreateShapeUIButton(int shapeType)
+{
+    // Debounce first
+    if (Time.unscaledTime - _lastCreateTime < createCooldown) return;
+    _lastCreateTime = Time.unscaledTime;
+
+    // Then call the real creator (which also has a re-entry guard)
+    CreateShape(shapeType);
+}
+
+
+
+    public void AssignTheRealObject()
+    {
+
+        foreach (var f in FindObjectsByType<MRUKAnchor>(
+       FindObjectsInactive.Include,
+       FindObjectsSortMode.InstanceID))
+        {
+
+            GameObject s = Instantiate(ProgramableRealobjectPrefab, f.transform.position, f.transform.rotation);
+            f.transform.SetParent(s.transform);
+            ProgramableObject programablerealobj = s.GetComponent<ProgramableObject>();
+
+
+            programablerealobj.isRealObject = true;
+            programablerealobj.shape = f.gameObject;
+
+
+
+            if (programablerealobj.shape.GetComponentInChildren<MeshRenderer>()) print(f.gameObject.name + "has Renderer");
+            else print(f.gameObject.name + "has no Renderer");
+
+            programablerealobj.ShapeRenderer = programablerealobj.shape.GetComponentInChildren<MeshRenderer>();
+
+
+
+        }
+
+
+
+
+    }
+
+    public void DelayCreateRealobject()
+    {
+
+        StartCoroutine(DelayAssign());
+    }
+
+
+    public IEnumerator  DelayAssign()
+    {
+        yield return new WaitForSeconds(0.1f);
+
+        AssignTheRealObject();
+
+
+
+    }
+
+
+
+
+
 
     private void OnDestroy()
     {
@@ -119,8 +203,16 @@ public class PromptedWorldManager : MonoBehaviour
         return false;
     }
 
-    // ---------- Create virtual object ----------
-    public void CreateShape(int shapeType)
+    bool shapeiscreating = false;
+
+// --- Update your existing method (only this method’s body changed order) ---
+public void CreateShape(int shapeType)
+{
+    // Re-entry guard FIRST to prevent two instantiates in the same frame
+    if (shapeiscreating) return;
+    shapeiscreating = true;
+
+    try
     {
         if (ProgramableObjectPrefab == null)
         {
@@ -128,11 +220,10 @@ public class PromptedWorldManager : MonoBehaviour
             return;
         }
 
-        GameObject container = Instantiate(ProgramableObjectPrefab, userLeftHand.position, Quaternion.identity);
+        GameObject container = Instantiate(ProgramableObjectPrefab, spawnPoint.position, Quaternion.identity);
         container.name = $"{ProgramableObjectPrefab.name}_Virtual";
-        container.transform.localPosition = Vector3.zero;
         container.transform.localRotation = Quaternion.identity;
-        container.transform.localScale = Vector3.one * 0.2f;
+        container.transform.localScale   = Vector3.one * 0.2f;
 
         var prog = container.GetComponent<ProgramableObject>();
         if (prog == null)
@@ -164,8 +255,26 @@ public class PromptedWorldManager : MonoBehaviour
         if (!_all.Contains(prog)) Register(prog);
         selectedObject = container;
     }
+    finally
+    {
+        shapeiscreating = false;
+    }
+}
 
-    public void setSelectedObject(GameObject obj) => selectedObject = obj;
+    public void setSelectedObject(GameObject obj)
+    {
+
+        selectedObject.GetComponent<ProgramableObject>()._selected = false;
+        selectedObject.GetComponent<ProgramableObject>().ClearLatchedHighlight();
+
+
+
+        selectedObject = obj;
+        
+
+
+
+    }  
 
     // ---------- TrackedObject Collector ----------
     public void RefreshTrackedObjects()
@@ -244,6 +353,10 @@ public class PromptedWorldManager : MonoBehaviour
         }
         foreach (var r in toRemove) _trackedMap.Remove(r);
     }
+
+
+
+
 
     // === Add inside PromptedWorldManager ===
 

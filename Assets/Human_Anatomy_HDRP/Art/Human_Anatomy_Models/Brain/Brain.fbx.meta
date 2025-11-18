@@ -1,0 +1,171 @@
+fileFormatVersion: 2
+guid: 094eb73669630c54d9de9d6cd13ca0a4
+ModelImporter:
+  serializedVersion: 23
+  fileIDToRecycleName:
+    100000: Amygdala_Brain_Left
+    100002: Amygdala_Brain_right
+    100004: //RootNode
+    100006: Brain__right
+    100008: Brain_element
+    100010: Brain_Left
+    100012: Callosum_Brain
+    100014: Cerebellum_Low
+    400000: Amygdala_Brain_Left
+    400002: Amygdala_Brain_right
+    400004: //RootNode
+    400006: Brain__right
+    400008: Brain_element
+    400010: Brain_Left
+    400012: Callosum_Brain
+    400014: Cerebellum_Low
+    2100000: Amygdala_M
+    2100002: lambert2
+    2100004: lambert3
+    2100006: Cerebellum_M
+    2100008: Collosum_M
+    2100010: lambert4
+    2300000: Amygdala_Brain_Left
+    2300002: Amygdala_Brain_right
+    2300004: Brain__right
+    2300006: Brain_element
+    2300008: Brain_Left
+    2300010: Callosum_Brain
+    2300012: Cerebellum_Low
+    3300000: Amygdala_Brain_Left
+    3300002: Amygdala_Brain_right
+    3300004: Brain__right
+    3300006: Brain_element
+    3300008: Brain_Left
+    3300010: Callosum_Brain
+    3300012: Cerebellum_Low
+    4300000: Amygdala_Brain_right
+    4300002: Brain_Left
+    4300004: Brain__right
+    4300006: Cerebellum_Low
+    4300008: Callosum_Brain
+    4300010: Amygdala_Brain_Left
+    4300012: Brain_element
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Amygdala_M
+    second: {fileID: 2100000, guid: 71505c08b0c71c9449632da22a62ced0, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Cerebellum_M
+    second: {fileID: 2100000, guid: cb07c71f77cf04149994a3e57c92f92d, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Collosum_M
+    second: {fileID: 2100000, guid: 497b0451a3d2b7f48988f4f7c7c758e5, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: lambert2
+    second: {fileID: 2100000, guid: 16f9d036bb3fb0d47ae876bb20824787, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: lambert3
+    second: {fileID: 2100000, guid: fb978534edd0a3240971b26524acf403, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: lambert4
+    second: {fileID: 2100000, guid: f0d4f07b932396143a950020ff59e5cd, type: 2}
+  materials:
+    importMaterials: 1
+    materialName: 0
+    materialSearch: 1
+    materialLocation: 1
+  animations:
+    legacyGenerateAnimations: 4
+    bakeSimulation: 0
+    resampleCurves: 1
+    optimizeGameObjects: 0
+    motionNodeName: 
+    rigImportErrors: 
+    rigImportWarnings: 
+    animationImportErrors: 
+    animationImportWarnings: 
+    animationRetargetingWarnings: 
+    animationDoRetargetingWarnings: 0
+    importAnimatedCustomProperties: 0
+    importConstraints: 0
+    animationCompression: 1
+    animationRotationError: 0.5
+    animationPositionError: 0.5
+    animationScaleError: 0.5
+    animationWrapMode: 0
+    extraExposedTransformPaths: []
+    extraUserProperties: []
+    clipAnimations: []
+    isReadable: 1
+  meshes:
+    lODScreenPercentages: []
+    globalScale: 1
+    meshCompression: 0
+    addColliders: 0
+    useSRGBMaterialColor: 1
+    importVisibility: 1
+    importBlendShapes: 1
+    importCameras: 1
+    importLights: 1
+    swapUVChannels: 0
+    generateSecondaryUV: 1
+    useFileUnits: 1
+    optimizeMeshForGPU: 1
+    keepQuads: 0
+    weldVertices: 1
+    preserveHierarchy: 0
+    indexFormat: 0
+    secondaryUVAngleDistortion: 8
+    secondaryUVAreaDistortion: 15
+    secondaryUVHardAngle: 180
+    secondaryUVPackMargin: 18
+    useFileScale: 1
+    previousCalculatedGlobalScale: 1
+    hasPreviousCalculatedGlobalScale: 0
+  tangentSpace:
+    normalSmoothAngle: 60
+    normalImportMode: 0
+    tangentImportMode: 3
+    normalCalculationMode: 4
+    legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 0
+    blendShapeNormalImportMode: 1
+    normalSmoothingSource: 0
+  importAnimation: 1
+  copyAvatar: 0
+  humanDescription:
+    serializedVersion: 2
+    human: []
+    skeleton: []
+    armTwist: 0.5
+    foreArmTwist: 0.5
+    upperLegTwist: 0.5
+    legTwist: 0.5
+    armStretch: 0.05
+    legStretch: 0.05
+    feetSpacing: 0
+    rootMotionBoneName: 
+    hasTranslationDoF: 0
+    hasExtraRoot: 0
+    skeletonHasParents: 1
+  lastHumanDescriptionAvatarSource: {instanceID: 0}
+  animationType: 0
+  humanoidOversampling: 1
+  additionalBone: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 147001
+  packageName: Human_Anatomy_HDRP
+  packageVersion: 1.0
+  assetPath: Assets/Human_Anatomy_HDRP/Art/Human_Anatomy_Models/Brain/Brain.fbx
+  uploadId: 315629
