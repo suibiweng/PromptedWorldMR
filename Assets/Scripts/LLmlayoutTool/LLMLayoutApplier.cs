@@ -38,6 +38,14 @@ public class LLMLayoutApplier : MonoBehaviour
     [TextArea(3, 20)]
     public string LastLayoutJson;
 
+    [Header("Optional MR Lasso Group Break")]
+    [Tooltip("If set, any active lasso group will be broken after a layout is applied.")]
+    public LassoSelectorMR3D lassoSelectorMR3D;
+
+    [Header("Spawn Offset")]
+    [Tooltip("Extra Y offset applied ONLY during initial spawning (not later relayouts).")]
+    public float initialSpawnYOffset = 1.0f;
+
     // Internal representation of parsed layout
     [Serializable]
     public class LayoutVector3
@@ -161,6 +169,8 @@ public class LLMLayoutApplier : MonoBehaviour
             sourceObject == null &&
             instanceCount > 1;
 
+        bool applied = false;
+
         if (singleExistingAsTemplate)
         {
             if (verboseLogging)
@@ -170,16 +180,16 @@ public class LLMLayoutApplier : MonoBehaviour
             }
 
             UseSingleExistingAsTemplateAndSpawn(plan, isLocal);
-            return;
+            applied = true;
         }
-
-        if (canRelayoutExisting)
+        else if (canRelayoutExisting)
         {
             if (verboseLogging)
             {
                 Debug.Log("[LLMLayoutApplier] Relayouting existing objects (count = " + existingCount + ").");
             }
             ApplyToExistingObjects(plan, isLocal);
+            applied = true;
         }
         else
         {
@@ -196,6 +206,15 @@ public class LLMLayoutApplier : MonoBehaviour
             }
 
             ApplyBySpawningCopies(plan, isLocal);
+            applied = true;
+        }
+
+        // After layout is applied, break any active lasso group so children return
+        // to their original parents (or ungroupParent) and the temporary group parent
+        // is destroyed.
+        if (applied && lassoSelectorMR3D != null)
+        {
+            lassoSelectorMR3D.BreakCurrentGroup();
         }
     }
 
@@ -231,6 +250,8 @@ public class LLMLayoutApplier : MonoBehaviour
             LayoutInstance inst0 = insts[0];
 
             Vector3 pos = inst0.position != null ? inst0.position.ToUnityVector3() : Vector3.zero;
+            pos.y += initialSpawnYOffset; // initial generation Y offset
+
             Vector3 euler = inst0.rotationEuler != null ? inst0.rotationEuler.ToUnityVector3() : Vector3.zero;
 
             Vector3 baseScale = template.localScale;
@@ -269,6 +290,8 @@ public class LLMLayoutApplier : MonoBehaviour
             Vector3 finalScale = Vector3.Scale(baseScale, scaleMul);
 
             Vector3 pos = inst.position != null ? inst.position.ToUnityVector3() : Vector3.zero;
+            pos.y += initialSpawnYOffset; // initial generation Y offset
+
             Vector3 euler = inst.rotationEuler != null ? inst.rotationEuler.ToUnityVector3() : Vector3.zero;
 
             if (isLocal)
@@ -331,6 +354,8 @@ public class LLMLayoutApplier : MonoBehaviour
             Vector3 finalScale = Vector3.Scale(baseScale, scaleMul);
 
             Vector3 pos = inst.position != null ? inst.position.ToUnityVector3() : Vector3.zero;
+            pos.y += initialSpawnYOffset; // initial generation Y offset
+
             Vector3 euler = inst.rotationEuler != null ? inst.rotationEuler.ToUnityVector3() : Vector3.zero;
 
             if (isLocal)
@@ -382,6 +407,7 @@ public class LLMLayoutApplier : MonoBehaviour
             if (t == null) continue;
 
             Vector3 pos = inst.position != null ? inst.position.ToUnityVector3() : Vector3.zero;
+            // No Y offset here: this is for relayout, not initial spawn
             Vector3 euler = inst.rotationEuler != null ? inst.rotationEuler.ToUnityVector3() : Vector3.zero;
 
             // Compute final scale: CURRENT scale * LLM scale multiplier (default 1,1,1)

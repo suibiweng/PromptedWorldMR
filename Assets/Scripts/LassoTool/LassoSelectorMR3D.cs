@@ -47,7 +47,7 @@ public class LassoSelectorMR3D : MonoBehaviour
     public bool autoPushSelectionToLayout = true;
 
     [Header("Grouping")]
-    [Tooltip("Prefab with a BoxCollider + AutoBoxColliderFromChildren. Selected objects will become its children.")]
+    [Tooltip("Prefab with a BoxCollider + GroupSelection. Selected objects will become its children.")]
     public GameObject groupPrefab;
 
     [Tooltip("Minimum number of selected objects required to form a group.")]
@@ -55,6 +55,10 @@ public class LassoSelectorMR3D : MonoBehaviour
 
     [Tooltip("Optional parent to reattach children to when the group is destroyed. If null, uses world root.")]
     public Transform ungroupParent;
+
+    [Header("Optional Click Group Grouper")]
+    [Tooltip("If assigned, any existing click-based group will be broken when a new lasso starts.")]
+    public ClickSelectionGrouper clickSelectionGrouper;
 
     [Header("Debug / Runtime Info")]
     [Tooltip("Objects currently selected by the last lasso operation.")]
@@ -92,6 +96,12 @@ public class LassoSelectorMR3D : MonoBehaviour
         if (drawTip == null)
         {
             Debug.LogWarning("LassoSelectorMR3D: drawTip is not assigned.");
+        }
+
+        // Auto-find ClickSelectionGrouper if not wired
+        if (clickSelectionGrouper == null)
+        {
+            clickSelectionGrouper = FindObjectOfType<ClickSelectionGrouper>();
         }
     }
 
@@ -141,6 +151,15 @@ public class LassoSelectorMR3D : MonoBehaviour
 
     private void BeginLasso()
     {
+        // Break any existing lasso group
+        BreakCurrentGroup();
+
+        // Also break any click-selection-based group
+        if (clickSelectionGrouper != null)
+        {
+            clickSelectionGrouper.BreakCurrentGroup();
+        }
+
         if (drawTip == null || cam == null) return;
 
         _isDrawing = true;
@@ -211,7 +230,7 @@ public class LassoSelectorMR3D : MonoBehaviour
         // Run selection
         SelectObjectsInsideLasso();
 
-        // 🔹 Handle grouping (destroy old group, create new one if needed)
+        // Handle grouping (destroy old group, create new one if needed)
         HandleGroupingAfterSelection();
 
         // After we know the selection, optionally push it into the layout system
@@ -350,7 +369,26 @@ public class LassoSelectorMR3D : MonoBehaviour
 
     private void Highlight(GameObject go, bool selected)
     {
-        // Optional highlighting hook
+        // Prefer the ProgramableObject outline, if present
+        var po = go.GetComponent<ProgramableObject>();
+        if (po != null)
+        {
+            if (selected)
+                po.SetLatchedHighlight(true);
+            else
+                po.ClearLatchedHighlight();
+            return;
+        }
+
+        // Fallback: direct Outline on the object (or its children)
+        var outline = go.GetComponentInChildren<Outline>(includeInactive: true);
+        if (outline != null)
+        {
+            outline.enabled = selected;
+            return;
+        }
+
+        // Last resort: color-based highlight for anything that doesn't use Outline
         var rend = go.GetComponent<Renderer>();
         if (rend == null) return;
         rend.material.color = selected ? Color.yellow : Color.white;
@@ -414,8 +452,13 @@ public class LassoSelectorMR3D : MonoBehaviour
             }
         }
 
+        originalParents.Clear();
+
+        // Remove the lasso group object itself
         Destroy(activeGroup);
         activeGroup = null;
+
+        Debug.Log("[LassoSelectorMR3D] Lasso group broken (group GameObject destroyed).");
     }
 
     /// <summary>
@@ -460,5 +503,11 @@ public class LassoSelectorMR3D : MonoBehaviour
         {
             autoCol.RecalculateNow();
         }
+    }
+
+    // Public API so other systems can break the current lasso group
+    public void BreakCurrentGroup()
+    {
+        ClearExistingGroup();
     }
 }

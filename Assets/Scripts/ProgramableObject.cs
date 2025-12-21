@@ -40,7 +40,7 @@ public class ProgramableObject : MonoBehaviour
     public GameObject shape;
     public Transform shapeRoot;
 
-    // Your existing QuickOutline component. We only enable/disable it.
+    [Tooltip("Outline component used for selection highlight.")]
     public Outline selectOutline;
 
     [Header("Interaction Source")]
@@ -53,11 +53,11 @@ public class ProgramableObject : MonoBehaviour
     [Tooltip("If true, outline also shows while hovering (when not latched).")]
     public bool highlightOnHover = false;
 
-    [Tooltip("Latch/sticky highlight: toggled on each Select ENTER, stays until next Select ENTER.")]
+    [Tooltip("If true, selection is sticky: click toggles it on/off (latched).")]
     public bool stickyHighlightEnabled = true;
 
     [Header("User Anchors & Proximity")]
-    public Transform userRoot; // reserved for future use
+    public Transform userRoot;
     public Transform userLeftHand;
     public Transform userRightHand;
     [Range(0.01f, 0.5f)] public float Touchingdistance = 0.1f;
@@ -71,16 +71,20 @@ public class ProgramableObject : MonoBehaviour
     public UnityEvent onProximityEnter;
     public UnityEvent onProximityExit;
 
-    // --- private state ---
+    // --- internal state ---
     public bool _selected;
     public bool _hovering;
     public bool _prevTouching;
-    public bool highlightLatched;                    // sticky highlight state
+
+    [Tooltip("Sticky selection state. True means this object is logically selected.")]
+    public bool highlightLatched;
+
     private InteractableState _lastState = InteractableState.Normal;
 
     // ========= PROMPT LOG (add-only) =========
     [Header("Prompt Log")]
     [SerializeField] private List<PromptLogEntry> _promptLog = new List<PromptLogEntry>();
+
     [Serializable] public class PromptLogUpdatedEvent : UnityEvent<PromptLogEntry> { }
     public PromptLogUpdatedEvent OnPromptLogUpdated;
     public IReadOnlyList<PromptLogEntry> PromptLog => _promptLog;
@@ -104,6 +108,7 @@ public class ProgramableObject : MonoBehaviour
             selectOutline = shape.GetComponentInChildren<Outline>(includeInactive: true);
 
         SetOutline(false);
+        highlightLatched = false;
     }
 
     void Start()
@@ -132,10 +137,9 @@ public class ProgramableObject : MonoBehaviour
         ProximityTouchingDetection();
     }
 
-    // ---------- Public API (kept from your original) ----------
+    // ---------- Public helpers ----------
 
     public bool hasLuaScript() => GetComponent<LuaBehaviour>() != null;
-
 
     public void setShape(GameObject obj)
     {
@@ -151,11 +155,23 @@ public class ProgramableObject : MonoBehaviour
         if (selectOutline == null)
             selectOutline = shape.GetComponentInChildren<Outline>(includeInactive: true);
 
-        // sync visuals
         UpdateHighlightVisual();
     }
 
-    // ========== STATE HANDLING ==========
+    // These are used by LassoSelectorMR3D (and handy for code)
+    public void SetLatchedHighlight(bool on)
+    {
+        highlightLatched = on;
+        UpdateHighlightVisual();
+    }
+
+    public void ClearLatchedHighlight()
+    {
+        highlightLatched = false;
+        UpdateHighlightVisual();
+    }
+
+    // ========== Interaction state wiring ==========
 
     private void OnViewStateChanged(InteractableStateChangeArgs args)
     {
@@ -183,19 +199,12 @@ public class ProgramableObject : MonoBehaviour
         if (prevState != InteractableState.Select && newState == InteractableState.Select)
         {
             _selected = true;
-
-            // Latch/toggle sticky highlight on SELECT ENTER (if enabled)
-            if (stickyHighlightEnabled)
-                highlightLatched = !highlightLatched;
-
             onSelectEnter?.Invoke();
             OnSelectEnter();
         }
         else if (prevState == InteractableState.Select && newState != InteractableState.Select)
         {
             _selected = false;
-            // We do NOT auto-clear the latch here; it stays until next Select ENTER
-
             onSelectExit?.Invoke();
             OnSelectExit();
         }
@@ -203,13 +212,13 @@ public class ProgramableObject : MonoBehaviour
         UpdateHighlightVisual();
     }
 
-    // Centralized highlight decision
+    // Decide whether outline should be visible
     private void UpdateHighlightVisual()
     {
         bool show =
-            (stickyHighlightEnabled && highlightLatched) ||       // latched wins
-            (!stickyHighlightEnabled && _selected) ||             // classic: show when selected
-            (!stickyHighlightEnabled && highlightOnHover && _hovering); // optional hover when not sticky
+            (stickyHighlightEnabled && highlightLatched) ||
+            (!stickyHighlightEnabled && _selected) ||
+            (!stickyHighlightEnabled && highlightOnHover && _hovering);
 
         SetOutline(show);
     }
@@ -220,65 +229,43 @@ public class ProgramableObject : MonoBehaviour
             selectOutline.enabled = on;
     }
 
-
-
-    // ========== PUBLIC HELPERS FOR STICKY CONTROL ==========
-
-    // Manually toggle the latched highlight (e.g., call from a UI button or another script)
-    public void ToggleLatchedHighlight()
-    {
-        highlightLatched = !highlightLatched;
-        UpdateHighlightVisual();
-    }
-
-    // Force on/off
-    public void SetLatchedHighlight(bool on)
-    {
-        highlightLatched = on;
-        UpdateHighlightVisual();
-    }
-
-    public void ClearLatchedHighlight()
-    {
-        highlightLatched = false;
-        UpdateHighlightVisual();
-    }
-
-    // ========== OPTIONAL OVERRIDABLE HOOKS ==========
+    // ========== OVERRIDABLE HOOKS ==========
 
     protected virtual void OnHoverEnter()
     {
-        // Custom code on hover enter
+        // custom hover enter
     }
 
     protected virtual void OnHoverExit()
     {
-        // Custom code on hover exit
+        // custom hover exit
     }
 
     protected virtual void OnSelectEnter()
     {
-        // Keep your existing selection behavior
+        // MULTI-SELECT: toggle this object in the manager’s dynamic list
         if (promptedWorldManager != null)
         {
-            promptedWorldManager.setSelectedObject(this.gameObject) ;
-         //   FindAnyObjectByType<OpenAILuaGenerator>().AssignTarget(promptedWorldManager.selectedObject);
+            promptedWorldManager.ToggleSelection(this.gameObject);
+            // Sync latched highlight to manager’s selection state
+            highlightLatched = promptedWorldManager.IsSelected(this.gameObject);
+        }
+        else
+        {
+            // Fallback: local toggle
+            highlightLatched = !highlightLatched;
         }
 
-        // Custom code on select enter (e.g., lua trigger)
-        // if (TryGetComponent<LuaBehaviour>(out var lua)) lua.Trigger();
+        UpdateHighlightVisual();
     }
 
-     protected virtual void OnSelectExit()
+    protected virtual void OnSelectExit()
     {
-        // Custom code on select exit
+        // Do not change selection here; click toggling is enough.
     }
 
     // ========= PROMPT LOG PUBLIC API =========
 
-    /// <summary>
-    /// Call when a prompt starts; returns log entry id (GUID).
-    /// </summary>
     public string BeginPromptLog(string prompt, string mode, string model)
     {
         var entry = new PromptLogEntry
@@ -301,9 +288,6 @@ public class ProgramableObject : MonoBehaviour
         return entry.id;
     }
 
-    /// <summary>
-    /// Call on success to finalize the entry.
-    /// </summary>
     public void CompletePromptLogSuccess(string id, string luaAppliedText, float durationSec, int inputTokens = 0, int outputTokens = 0)
     {
         var e = FindEntry(id);
@@ -317,9 +301,6 @@ public class ProgramableObject : MonoBehaviour
         OnPromptLogUpdated?.Invoke(e);
     }
 
-    /// <summary>
-    /// Call on failure to finalize the entry with an error note.
-    /// </summary>
     public void CompletePromptLogFailure(string id, string errorMessage, float durationSec)
     {
         var e = FindEntry(id);
@@ -336,8 +317,6 @@ public class ProgramableObject : MonoBehaviour
         _promptLog.Clear();
         OnPromptLogUpdated?.Invoke(null);
     }
-
-    // ========= PROMPT LOG INTERNALS =========
 
     private PromptLogEntry FindEntry(string id)
     {
@@ -357,8 +336,7 @@ public class ProgramableObject : MonoBehaviour
         }
     }
 
-    
-    // ========== Interaction ==========
+    // ========== Proximity / misc ==========
 
     private void ProximityTouchingDetection()
     {
@@ -375,7 +353,7 @@ public class ProgramableObject : MonoBehaviour
         if (!isToching && _prevTouching) onProximityExit?.Invoke();
         _prevTouching = isToching;
     }
-    
+
     public void changeColor(Color color)
     {
         if (ShapeRenderer != null)
@@ -396,5 +374,4 @@ public class ProgramableObject : MonoBehaviour
         Objimage.texture = texture;
         Objimage.color = Color.white;
     }
-
 }

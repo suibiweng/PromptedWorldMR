@@ -2,24 +2,21 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Bridge between MR 3D lasso selection and the LLM layout system.
+/// Bridge between MR 3D lasso selection / click selection and the LLM layout system.
 /// 
-/// Usage:
-/// - Put this on any GameObject in your scene (e.g., "LayoutController").
-/// - Assign:
-///     - lassoSelector: your LassoSelectorMR3D component
-///     - layoutRunner : your LayoutRunner component
-/// - Optionally call the public methods from UI buttons or context menu:
-///     - UseCurrentLassoSelection()
-///     - RelayoutSelectionInCircle()
-///     - RelayoutSelectionInLine()
-///     - RelayoutSelectionInGrid()
+/// Now supports:
+/// - LassoSelectorMR3D selection
+/// - PromptedWorldManager multi-selection (ProgramableObject click)
+/// Combined selection (union) is sent to LayoutRunner.
 /// </summary>
 public class LassoToLayoutRunnerBridge : MonoBehaviour
 {
     [Header("References")]
-    [Tooltip("The MR 3D lasso selector that holds the current selection.")]
+    [Tooltip("The MR 3D lasso selector that holds the current lasso selection (optional).")]
     public LassoSelectorMR3D lassoSelector;
+
+    [Tooltip("PromptedWorldManager that tracks click-based selections from ProgramableObject (optional).")]
+    public PromptedWorldManager promptedWorldManager;
 
     [Tooltip("The LayoutRunner that talks to the LLM and applies layouts.")]
     public LayoutRunner layoutRunner;
@@ -50,53 +47,40 @@ public class LassoToLayoutRunnerBridge : MonoBehaviour
     public bool verboseLogging = true;
 
     /// <summary>
-    /// Reads the current selection from the lasso, and pushes it into
-    /// layoutRunner.existingObjectsOverride so the LLM can relayout them.
+    /// Reads the current selection from:
+    /// - lassoSelector (if assigned)
+    /// - promptedWorldManager.SelectedObjects (if assigned)
+    /// and pushes the UNION into layoutRunner.existingObjectsOverride.
     /// Does NOT change the prompt; you can type whatever you want in LayoutRunner.
     /// </summary>
     public void UseCurrentLassoSelection()
     {
-        if (!EnsureRefs()) return;
+        if (!EnsureRunner()) return;
 
-        var selection = lassoSelector.GetCurrentSelection();
-        if (selection == null || selection.Count == 0)
-        {
-            if (verboseLogging)
-                Debug.LogWarning("[LassoToLayoutRunnerBridge] Lasso selection is empty.");
-            layoutRunner.status = "No objects selected via lasso.";
-            return;
-        }
-
-        // Convert to Transform[]
-        Transform[] arr = new Transform[selection.Count];
-        for (int i = 0; i < selection.Count; i++)
-        {
-            arr[i] = selection[i] != null ? selection[i].transform : null;
-        }
-
-        layoutRunner.existingObjectsOverride = arr;
+        var selection = GetCombinedSelection();
+        if (!PrepareSelection(selection)) return;
 
         if (string.IsNullOrWhiteSpace(layoutRunner.initialLayoutPrompt))
         {
             layoutRunner.initialLayoutPrompt = defaultRelayoutPrompt;
         }
 
-        layoutRunner.status = $"Using lasso selection ({selection.Count} objs) as existingObjects.";
+        layoutRunner.status = $"Using selection ({selection.Count} objs) as existingObjects.";
         if (verboseLogging)
         {
-            Debug.Log($"[LassoToLayoutRunnerBridge] Wired {selection.Count} selected objects into LayoutRunner.existingObjectsOverride.");
+            Debug.Log($"[LassoToLayoutRunnerBridge] Wired {selection.Count} selected objects (lasso + click) into LayoutRunner.existingObjectsOverride.");
         }
     }
 
     /// <summary>
-    /// Convenience: use the current lasso selection and immediately ask the LLM
+    /// Convenience: use the current (lasso + click) selection and immediately ask the LLM
     /// to arrange them in a circle.
     /// </summary>
     public void RelayoutSelectionInCircle()
     {
-        if (!EnsureRefs()) return;
+        if (!EnsureRunner()) return;
 
-        var selection = lassoSelector.GetCurrentSelection();
+        var selection = GetCombinedSelection();
         if (!PrepareSelection(selection)) return;
 
         int count = selection.Count;
@@ -111,14 +95,14 @@ public class LassoToLayoutRunnerBridge : MonoBehaviour
     }
 
     /// <summary>
-    /// Convenience: use the current lasso selection and ask the LLM
+    /// Convenience: use the current (lasso + click) selection and ask the LLM
     /// to arrange them in a line.
     /// </summary>
     public void RelayoutSelectionInLine()
     {
-        if (!EnsureRefs()) return;
+        if (!EnsureRunner()) return;
 
-        var selection = lassoSelector.GetCurrentSelection();
+        var selection = GetCombinedSelection();
         if (!PrepareSelection(selection)) return;
 
         int count = selection.Count;
@@ -133,14 +117,14 @@ public class LassoToLayoutRunnerBridge : MonoBehaviour
     }
 
     /// <summary>
-    /// Convenience: use the current lasso selection and ask the LLM
+    /// Convenience: use the current (lasso + click) selection and ask the LLM
     /// to arrange them in a grid.
     /// </summary>
     public void RelayoutSelectionInGrid()
     {
-        if (!EnsureRefs()) return;
+        if (!EnsureRunner()) return;
 
-        var selection = lassoSelector.GetCurrentSelection();
+        var selection = GetCombinedSelection();
         if (!PrepareSelection(selection)) return;
 
         int count = selection.Count;
@@ -156,20 +140,59 @@ public class LassoToLayoutRunnerBridge : MonoBehaviour
 
     // ---------- Helpers ----------
 
-    private bool EnsureRefs()
+    /// <summary>
+    /// Combine lasso selection and PromptedWorldManager selection into one list (no duplicates).
+    /// </summary>
+    private List<GameObject> GetCombinedSelection()
     {
-        if (lassoSelector == null)
+        var combined = new List<GameObject>();
+        var seen = new HashSet<GameObject>();
+
+        // Lasso selection
+        if (lassoSelector != null)
         {
-            Debug.LogError("[LassoToLayoutRunnerBridge] lassoSelector is not assigned.");
-            return false;
+            var lassoSel = lassoSelector.GetCurrentSelection();
+            if (lassoSel != null)
+            {
+                for (int i = 0; i < lassoSel.Count; i++)
+                {
+                    var go = lassoSel[i];
+                    if (go != null && seen.Add(go))
+                        combined.Add(go);
+                }
+            }
         }
 
+        // Click selection from PromptedWorldManager
+        if (promptedWorldManager != null)
+        {
+            var clickSel = promptedWorldManager.GetSelectedObjects();
+            if (clickSel != null)
+            {
+                for (int i = 0; i < clickSel.Count; i++)
+                {
+                    var go = clickSel[i];
+                    if (go != null && seen.Add(go))
+                        combined.Add(go);
+                }
+            }
+        }
+
+        if (verboseLogging)
+        {
+            Debug.Log($"[LassoToLayoutRunnerBridge] GetCombinedSelection: {combined.Count} total objects (lasso + click).");
+        }
+
+        return combined;
+    }
+
+    private bool EnsureRunner()
+    {
         if (layoutRunner == null)
         {
             Debug.LogError("[LassoToLayoutRunnerBridge] layoutRunner is not assigned.");
             return false;
         }
-
         return true;
     }
 
@@ -178,8 +201,8 @@ public class LassoToLayoutRunnerBridge : MonoBehaviour
         if (selection == null || selection.Count == 0)
         {
             if (verboseLogging)
-                Debug.LogWarning("[LassoToLayoutRunnerBridge] Lasso selection is empty.");
-            layoutRunner.status = "No objects selected via lasso.";
+                Debug.LogWarning("[LassoToLayoutRunnerBridge] Selection is empty (lasso + click).");
+            layoutRunner.status = "No objects selected (lasso or click).";
             return false;
         }
 
@@ -193,12 +216,17 @@ public class LassoToLayoutRunnerBridge : MonoBehaviour
         layoutRunner.existingObjectsOverride = arr;
         layoutRunner.status = $"Prepared {selection.Count} selected objects for LLM relayout.";
 
+        if (verboseLogging)
+        {
+            Debug.Log($"[LassoToLayoutRunnerBridge] Prepared {selection.Count} objects for layout relayout.");
+        }
+
         return true;
     }
 
     // Optional: context menu hooks for quick testing in Editor
 
-    [ContextMenu("Use Current Lasso Selection (no auto prompt)")]
+    [ContextMenu("Use Current Selection (Lasso + Click, no auto prompt)")]
     private void UseSelectionContextMenu()
     {
         UseCurrentLassoSelection();

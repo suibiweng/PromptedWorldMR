@@ -1,24 +1,18 @@
 using UnityEngine;
-using PromptedWorld;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Meta.XR.MRUtilityKit;
-using System.Collections;
+using PromptedWorld;
 
 [DisallowMultipleComponent]
 [DefaultExecutionOrder(-100)]
 public class PromptedWorldManager : MonoBehaviour
 {
-
-    // --- Add these fields near your other fields ---
-[Header("Create Shape Debounce")]
-[Tooltip("Minimum time between CreateShape calls (seconds) to ignore double-clicks / duplicate events.")]
-public float createCooldown = 0.25f;
-private float _lastCreateTime = -999f;
-
-
-
-
+    [Header("Create Shape Debounce")]
+    [Tooltip("Minimum time between CreateShape calls (seconds) to ignore double-clicks / duplicate events.")]
+    public float createCooldown = 0.25f;
+    private float _lastCreateTime = -999f;
 
     [Header("User Anchors")]
     public Transform userHead;
@@ -32,8 +26,13 @@ private float _lastCreateTime = -999f;
     public GameObject ProgramableObjectPrefab;
     public GameObject ProgramableRealobjectPrefab;
 
-    [Header("Selection")]
+    [Header("Selection (single + multi)")]
+    [Tooltip("Last selected object (for legacy APIs).")]
     public GameObject selectedObject;
+
+    [Tooltip("Dynamic list of all currently selected objects (via click / ProgramableObject).")]
+    [SerializeField] private List<GameObject> selectedObjects = new List<GameObject>();
+    public IReadOnlyList<GameObject> SelectedObjects => selectedObjects;
 
     [Header("TrackedObject Collector")]
     [Tooltip("Tag for real-world anchors to wrap with ProgramableObjectPrefab.")]
@@ -41,102 +40,32 @@ private float _lastCreateTime = -999f;
     [Tooltip("If true, the manager rescans for TrackedObject every frame.")]
     public bool keepUpdatedEachFrame = true;
 
-    // --- Public views ---
+    // Public views
     public IReadOnlyList<ProgramableObject> RealObjects => _realObjects;
     public IReadOnlyList<ProgramableObject> VirtualObjects => _virtualObjects;
 
-    // --- Events ---
+    // Events
     public event Action<ProgramableObject> OnAdded;
     public event Action<ProgramableObject> OnRemoved;
     public event Action<ProgramableObject, bool> OnReclassified;
 
-    // --- Internals ---
+    // Internals
     public List<ProgramableObject> _realObjects = new();
-    public  List<ProgramableObject> _virtualObjects = new();
-    public  HashSet<ProgramableObject> _all = new();
+    public List<ProgramableObject> _virtualObjects = new();
+    public HashSet<ProgramableObject> _all = new();
     private readonly Dictionary<string, ProgramableObject> _byId = new();
     private readonly Dictionary<GameObject, ProgramableObject> _trackedMap = new();
 
-    // ---------- Lifecycle ----------
     private void Awake()
     {
-        Rebuild();               // catch pre-existing ProgramableObjects
-       // RefreshTrackedObjects(); // wrap TrackedObject-tagged objects
+        Rebuild();
     }
 
     private void Update()
     {
-        //  if (keepUpdatedEachFrame)
-        //  RefreshTrackedObjects();
+        if (keepUpdatedEachFrame)
+            RefreshTrackedObjects();
     }
-
-
-    // --- NEW: call this from your UI Button instead of CreateShape directly ---
-public void CreateShapeUIButton(int shapeType)
-{
-    // Debounce first
-    if (Time.unscaledTime - _lastCreateTime < createCooldown) return;
-    _lastCreateTime = Time.unscaledTime;
-
-    // Then call the real creator (which also has a re-entry guard)
-    CreateShape(shapeType);
-}
-
-
-
-    public void AssignTheRealObject()
-    {
-
-        foreach (var f in FindObjectsByType<MRUKAnchor>(
-       FindObjectsInactive.Include,
-       FindObjectsSortMode.InstanceID))
-        {
-
-            GameObject s = Instantiate(ProgramableRealobjectPrefab, f.transform.position, f.transform.rotation);
-            f.transform.SetParent(s.transform);
-            ProgramableObject programablerealobj = s.GetComponent<ProgramableObject>();
-
-
-            programablerealobj.isRealObject = true;
-            programablerealobj.shape = f.gameObject;
-
-
-
-            if (programablerealobj.shape.GetComponentInChildren<MeshRenderer>()) print(f.gameObject.name + "has Renderer");
-            else print(f.gameObject.name + "has no Renderer");
-
-            programablerealobj.ShapeRenderer = programablerealobj.shape.GetComponentInChildren<MeshRenderer>();
-
-
-
-        }
-
-
-
-
-    }
-
-    public void DelayCreateRealobject()
-    {
-
-        StartCoroutine(DelayAssign());
-    }
-
-
-    public IEnumerator  DelayAssign()
-    {
-        yield return new WaitForSeconds(0.1f);
-
-        AssignTheRealObject();
-
-
-
-    }
-
-
-
-
-
 
     private void OnDestroy()
     {
@@ -145,9 +74,96 @@ public void CreateShapeUIButton(int shapeType)
         _all.Clear();
         _byId.Clear();
         _trackedMap.Clear();
+        selectedObjects.Clear();
+        selectedObject = null;
     }
 
-    // ---------- Public API ----------
+    // ---------- Selection API ----------
+
+    /// <summary>
+    /// Legacy single-selection API: clears list and sets a single selected object.
+    /// </summary>
+    public void setSelectedObject(GameObject obj)
+    {
+        selectedObjects.Clear();
+        if (obj != null)
+        {
+            selectedObjects.Add(obj);
+        }
+        selectedObject = obj;
+    }
+
+    /// <summary>
+    /// Toggle-based selection:
+    /// - If obj is already selected, remove it.
+    /// - If not, add it.
+    /// Keeps selectedObject synced to last selected item.
+    //</summary>
+    public void ToggleSelection(GameObject obj)
+    {
+        if (obj == null) return;
+
+        int index = selectedObjects.IndexOf(obj);
+        if (index >= 0)
+        {
+            // Unselect
+            selectedObjects.RemoveAt(index);
+            if (selectedObject == obj)
+            {
+                selectedObject = selectedObjects.Count > 0
+                    ? selectedObjects[selectedObjects.Count - 1]
+                    : null;
+            }
+        }
+        else
+        {
+            // Select
+            selectedObjects.Add(obj);
+            selectedObject = obj;
+        }
+    }
+
+    public void AddToSelection(GameObject obj)
+    {
+        if (obj == null) return;
+        if (!selectedObjects.Contains(obj))
+            selectedObjects.Add(obj);
+        selectedObject = obj;
+    }
+
+    public void RemoveFromSelection(GameObject obj)
+    {
+        if (obj == null) return;
+        int index = selectedObjects.IndexOf(obj);
+        if (index < 0) return;
+        selectedObjects.RemoveAt(index);
+        if (selectedObject == obj)
+        {
+            selectedObject = selectedObjects.Count > 0
+                ? selectedObjects[selectedObjects.Count - 1]
+                : null;
+        }
+    }
+
+    public void ClearSelection()
+    {
+        selectedObjects.Clear();
+        selectedObject = null;
+    }
+
+    public bool IsSelected(GameObject obj)
+    {
+        if (obj == null) return false;
+        return selectedObjects.Contains(obj);
+    }
+
+    public IReadOnlyList<GameObject> GetSelectedObjects()
+    {
+        return selectedObjects;
+    }
+
+    // ---------- Public Registry API ----------
+
     public void Rebuild()
     {
         _realObjects.Clear();
@@ -183,6 +199,9 @@ public void CreateShapeUIButton(int shapeType)
         if (!string.IsNullOrEmpty(p.id) && _byId.TryGetValue(p.id, out var cur) && cur == p)
             _byId.Remove(p.id);
         OnRemoved?.Invoke(p);
+
+        // Remove from selection
+        RemoveFromSelection(p.gameObject);
     }
 
     public void Reclassify(ProgramableObject p, bool nowIsReal)
@@ -203,80 +222,108 @@ public void CreateShapeUIButton(int shapeType)
         return false;
     }
 
+    // ---------- Spawning / Shape Creation ----------
+
     bool shapeiscreating = false;
 
-// --- Update your existing method (only this method’s body changed order) ---
-public void CreateShape(int shapeType)
-{
-    // Re-entry guard FIRST to prevent two instantiates in the same frame
-    if (shapeiscreating) return;
-    shapeiscreating = true;
-
-    try
+    public void CreateShapeUIButton(int shapeType)
     {
-        if (ProgramableObjectPrefab == null)
-        {
-            Debug.LogWarning("[PromptedWorldManager] ProgramableObjectPrefab is not assigned.");
-            return;
-        }
-
-        GameObject container = Instantiate(ProgramableObjectPrefab, spawnPoint.position, Quaternion.identity);
-        container.name = $"{ProgramableObjectPrefab.name}_Virtual";
-        container.transform.localRotation = Quaternion.identity;
-        container.transform.localScale   = Vector3.one * 0.2f;
-
-        var prog = container.GetComponent<ProgramableObject>();
-        if (prog == null)
-        {
-            Debug.LogError("[PromptedWorldManager] Prefab must contain ProgramableObject.");
-            Destroy(container);
-            return;
-        }
-
-        // Force VIRTUAL
-        if (prog.isRealObject)
-        {
-            prog.isRealObject = false;
-            if (_all.Contains(prog)) Reclassify(prog, false);
-        }
-
-        prog.promptedWorldManager = this;
-
-        GameObject shape = PrimitiveFactory.CreatePrimitive(shapeType, Vector3.zero, Quaternion.identity);
-        if (shape == null)
-        {
-            Debug.LogError("[PromptedWorldManager] PrimitiveFactory returned null.");
-            Destroy(container);
-            return;
-        }
-
-        shape.transform.SetParent(container.transform, false);
-        prog.setShape(shape);
-        if (!_all.Contains(prog)) Register(prog);
-        selectedObject = container;
+        if (Time.unscaledTime - _lastCreateTime < createCooldown) return;
+        _lastCreateTime = Time.unscaledTime;
+        CreateShape(shapeType);
     }
-    finally
+
+    public void CreateShape(int shapeType)
     {
-        shapeiscreating = false;
+        if (shapeiscreating) return;
+        shapeiscreating = true;
+
+        try
+        {
+            if (ProgramableObjectPrefab == null)
+            {
+                Debug.LogWarning("[PromptedWorldManager] ProgramableObjectPrefab is not assigned.");
+                return;
+            }
+
+            GameObject container = Instantiate(ProgramableObjectPrefab, spawnPoint.position, Quaternion.identity);
+            container.name = $"{ProgramableObjectPrefab.name}_Virtual";
+            container.transform.localRotation = Quaternion.identity;
+            container.transform.localScale = Vector3.one * 0.2f;
+
+            var prog = container.GetComponent<ProgramableObject>();
+            if (prog == null)
+            {
+                Debug.LogError("[PromptedWorldManager] Prefab must contain ProgramableObject.");
+                Destroy(container);
+                return;
+            }
+
+            if (prog.isRealObject)
+            {
+                prog.isRealObject = false;
+                if (_all.Contains(prog)) Reclassify(prog, false);
+            }
+
+            prog.promptedWorldManager = this;
+
+            GameObject shape = PrimitiveFactory.CreatePrimitive(shapeType, Vector3.zero, Quaternion.identity);
+            if (shape == null)
+            {
+                Debug.LogError("[PromptedWorldManager] PrimitiveFactory returned null.");
+                Destroy(container);
+                return;
+            }
+
+            shape.transform.SetParent(container.transform, false);
+            prog.setShape(shape);
+            if (!_all.Contains(prog)) Register(prog);
+
+            setSelectedObject(container);
+        }
+        finally
+        {
+            shapeiscreating = false;
+        }
     }
-}
 
-    public void setSelectedObject(GameObject obj)
+    // ---------- Real-object assignment ----------
+
+    public void AssignTheRealObject()
     {
+        foreach (var f in FindObjectsByType<MRUKAnchor>(
+                     FindObjectsInactive.Include,
+                     FindObjectsSortMode.InstanceID))
+        {
+            GameObject s = Instantiate(ProgramableRealobjectPrefab, f.transform.position, f.transform.rotation);
+            f.transform.SetParent(s.transform);
+            ProgramableObject programablerealobj = s.GetComponent<ProgramableObject>();
 
-        selectedObject.GetComponent<ProgramableObject>()._selected = false;
-        selectedObject.GetComponent<ProgramableObject>().ClearLatchedHighlight();
+            programablerealobj.isRealObject = true;
+            programablerealobj.shape = f.gameObject;
 
+            if (programablerealobj.shape.GetComponentInChildren<MeshRenderer>())
+                print(f.gameObject.name + " has Renderer");
+            else
+                print(f.gameObject.name + " has no Renderer");
 
+            programablerealobj.ShapeRenderer = programablerealobj.shape.GetComponentInChildren<MeshRenderer>();
+        }
+    }
 
-        selectedObject = obj;
-        
+    public void DelayCreateRealobject()
+    {
+        StartCoroutine(DelayAssign());
+    }
 
-
-
-    }  
+    public IEnumerator DelayAssign()
+    {
+        yield return new WaitForSeconds(0.1f);
+        AssignTheRealObject();
+    }
 
     // ---------- TrackedObject Collector ----------
+
     public void RefreshTrackedObjects()
     {
         if (ProgramableObjectPrefab == null) return;
@@ -289,7 +336,6 @@ public void CreateShape(int shapeType)
             if (src == null || !src.activeInHierarchy) continue;
             seen.Add(src);
 
-            // Already mapped?
             if (_trackedMap.TryGetValue(src, out var existing) && existing != null)
             {
                 if (existing.transform.parent != src.transform)
@@ -303,7 +349,6 @@ public void CreateShape(int shapeType)
                 continue;
             }
 
-            // Look for ProgramableObject child
             ProgramableObject foundChild = null;
             foreach (Transform child in src.transform)
             {
@@ -336,7 +381,6 @@ public void CreateShape(int shapeType)
             _trackedMap[src] = prog;
         }
 
-        // Cleanup for removed or inactive
         var toRemove = new List<GameObject>();
         foreach (var kv in _trackedMap)
         {
@@ -354,13 +398,8 @@ public void CreateShape(int shapeType)
         foreach (var r in toRemove) _trackedMap.Remove(r);
     }
 
+    // ---------- Lua run-all helpers ----------
 
-
-
-
-    // === Add inside PromptedWorldManager ===
-
-    // Run Lua on ALL tracked ProgramableObjects
     [ContextMenu("Lua • Run All")]
     public void RunAll()
     {
@@ -369,15 +408,10 @@ public void CreateShape(int shapeType)
             if (p == null) continue;
             var lb = p.GetComponent<LuaBehaviour>();
             if (lb == null) continue;
-
-            // ensure a script is loaded; if you rely on generation only, this may be empty.
-            // Start the run session (captures run-start pose + calls start()).
             lb.StartRun();
         }
     }
 
-    // Stop Lua on ALL tracked ProgramableObjects
-    // snapToStartPose: if true, each object snaps back to its 'run-start' position (the moment StartRun() was called)
     [ContextMenu("Lua • Stop All")]
     public void StopAll(bool snapToStartPose = true)
     {
@@ -386,8 +420,6 @@ public void CreateShape(int shapeType)
             if (p == null) continue;
             var lb = p.GetComponent<LuaBehaviour>();
             if (lb == null) continue;
-
-            // Temporarily enforce snap behavior if requested
             bool prev = lb.resetPositionOnStop;
             lb.resetPositionOnStop = snapToStartPose;
             lb.StopRun();
@@ -395,7 +427,6 @@ public void CreateShape(int shapeType)
         }
     }
 
-    // Optional: only Real objects
     [ContextMenu("Lua • Run All (Real)")]
     public void RunAllReal()
     {
@@ -422,7 +453,6 @@ public void CreateShape(int shapeType)
         }
     }
 
-    // Optional: only Virtual objects
     [ContextMenu("Lua • Run All (Virtual)")]
     public void RunAllVirtual()
     {
@@ -448,10 +478,4 @@ public void CreateShape(int shapeType)
             lb.resetPositionOnStop = prev;
         }
     }
-
-
-
-
-
-
 }

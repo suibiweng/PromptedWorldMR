@@ -11,6 +11,11 @@ using LuaProxies; // proxies namespace (Vector3Proxy, GameObjectProxy, PromptedM
 /// - Adds: self.prompted / self.promptedMatter / self.pm  (PromptedMatterProxy)
 /// - DOTween: global 'dotween' injected per Script via LuaDOTweenBootstrap.
 /// - start(self), update(self, dt), on_trigger(self, other), on_collision(self, col), on_stop(self) supported.
+///
+/// NOTE: For collision with child colliders:
+/// - Put Rigidbody + LuaBehaviour on the parent.
+/// - Put Colliders on children (no Rigidbody on children).
+/// - OnCollisionEnter here will still fire and pass a CollisionProxy into Lua.
 /// </summary>
 [DisallowMultipleComponent]
 public class LuaBehaviour : MonoBehaviour
@@ -26,6 +31,9 @@ public class LuaBehaviour : MonoBehaviour
 
     [Tooltip("When stopping, snap back to the position captured at the moment the script began running.")]
     public bool resetPositionOnStop = true;
+
+    [Tooltip("If true, StopRun() will force Rigidbody.isKinematic = true and zero its velocity.")]
+    public bool makeRigidbodyKinematicOnStop = true;
 
     [Header("Auto-Add Defaults (used by lazy proxy binding)")]
     public bool addRigidbodyIfMissing = true;
@@ -87,6 +95,17 @@ public class LuaBehaviour : MonoBehaviour
         runEnabled = false;
         SafeCall(_fnOnStopOptional);
         if (resetPositionOnStop) ResetToRunStartPosition();
+
+        if (makeRigidbodyKinematicOnStop)
+        {
+            var rb = GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic = true;
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
+        }
     }
 
     public void ToggleRun()
@@ -94,6 +113,26 @@ public class LuaBehaviour : MonoBehaviour
         if (runEnabled) StopRun();
         else StartRun();
     }
+
+    // === Simple wrappers for UI / SendMessage ===
+
+    /// <summary>
+    /// Called by UI "Play" button or via SendMessage("PlayLua").
+    /// </summary>
+    public void PlayLua()
+    {
+        StartRun();
+    }
+
+    /// <summary>
+    /// Called by UI "Stop" button or via SendMessage("StopLua").
+    /// </summary>
+    public void StopLua()
+    {
+        StopRun();
+    }
+
+    // ================================================
 
     void Update()
     {
@@ -177,20 +216,22 @@ public class LuaBehaviour : MonoBehaviour
         // New VM with your proxy-based environment
         _script = new Script(CoreModules.Preset_Default);
 
-        // Register proxy types (explicit; safe to call multiple times)
-        UserData.RegisterType<Vector3Proxy>();
-        UserData.RegisterType<GameObjectProxy>();
-        UserData.RegisterType<TransformProxy>();
-        UserData.RegisterType<RigidbodyProxy>();
-        UserData.RegisterType<ParticleSystemProxy>();
-        UserData.RegisterType<AudioSourceProxy>();
-        UserData.RegisterType<AnimatorProxy>();
-        UserData.RegisterType<TextProxy>();
-        UserData.RegisterType<ButtonProxy>();
-        UserData.RegisterType<CollisionProxy>();
-        UserData.RegisterType<LuaDOTween>();
-        UserData.RegisterType<PromptedMatterProxy>();
-        if (exposeProgramableProxy) UserData.RegisterType<ProgramableObjectProxy>();
+// Register proxy types (explicit; safe to call multiple times)
+UserData.RegisterType<Vector3Proxy>();
+UserData.RegisterType<GameObjectProxy>();
+UserData.RegisterType<TransformProxy>();
+UserData.RegisterType<RigidbodyProxy>();
+UserData.RegisterType<ParticleSystemProxy>();
+UserData.RegisterType<AudioSourceProxy>();
+UserData.RegisterType<AnimatorProxy>();
+UserData.RegisterType<TextProxy>();
+UserData.RegisterType<ButtonProxy>();
+UserData.RegisterType<CollisionProxy>();
+UserData.RegisterType<LuaDOTween>();
+UserData.RegisterType<PromptedMatterProxy>();
+UserData.RegisterType<TouchpadInputProxy>(); // NEW
+if (exposeProgramableProxy) UserData.RegisterType<ProgramableObjectProxy>();
+
 
         // (If any script wants to use raw Vector3 tables, this won’t hurt.)
         UserData.RegisterType<Vector3>();
@@ -265,6 +306,15 @@ public class LuaBehaviour : MonoBehaviour
                     break;
                 }
 
+                    // ---- NEW: touchpad input proxy ----
+                 case "touchpad":
+            {
+        var ts = GetComponent<TouchpadInputState>();
+        if (ts != null) bound = UserData.Create(new TouchpadInputProxy(ts));
+        break;
+            }
+
+
                 case "collider":
                 {
                     // Only add if explicitly enabled; default off because shape matters.
@@ -327,11 +377,11 @@ public class LuaBehaviour : MonoBehaviour
         _script.DoString(src);
 
         // Cache function handles if present
-        _fnStart         = _script.Globals.Get("start");
-        _fnUpdate        = _script.Globals.Get("update");
-        _fnOnTrigger     = _script.Globals.Get("on_trigger");
-        _fnOnCollision   = _script.Globals.Get("on_collision");
-        _fnOnStopOptional= _script.Globals.Get("on_stop");
+        _fnStart          = _script.Globals.Get("start");
+        _fnUpdate         = _script.Globals.Get("update");
+        _fnOnTrigger      = _script.Globals.Get("on_trigger");
+        _fnOnCollision    = _script.Globals.Get("on_collision");
+        _fnOnStopOptional = _script.Globals.Get("on_stop");
 
         // Keep preview synced
         _currentLuaPreview = src ?? string.Empty;

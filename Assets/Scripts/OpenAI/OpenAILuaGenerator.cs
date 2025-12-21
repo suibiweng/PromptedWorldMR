@@ -1,11 +1,10 @@
-// Assets/Scripts/LuaRuntime/OpenAILuaGenerator.cs
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
-using PromptedWorld; // for PromptedWorldManager reference (optional)
+using PromptedWorld;
 using TMPro;
 using UnityEngine.Events;
 
@@ -13,30 +12,25 @@ using UnityEngine.Events;
 public class OpenAILuaGenerator : MonoBehaviour
 {
     [Header("Target Object (Lua will run here)")]
-    [SerializeField] private GameObject target;             // assign in Inspector or via AssignTarget(...)
-    [SerializeField] private LuaBehaviour luaBehaviour;     // auto-filled from target
+    [SerializeField] private GameObject target;
+    [SerializeField] private LuaBehaviour luaBehaviour;
 
     [Header("Prompt Inputs")]
-    [TextArea(2, 6)] public string naturalLanguageIntent;   // user text
+    [TextArea(2, 6)]
+    public string naturalLanguageIntent;
 
     [Header("Resources Paths (no extension)")]
-    [Tooltip("System/base rules. e.g., 'LLM/base_prompt' -> Assets/Resources/LLM/base_prompt.txt")]
     [SerializeField] private string basePromptResourcePath = "LLM/base_prompt";
-
-    [Tooltip("Per-request template. e.g., 'LLM/user_prompt_template'")]
     [SerializeField] private string userPromptTemplateResourcePath = "LLM/user_prompt_template";
-
-    [Tooltip("Secrets key file. e.g., 'Secrets/openai_api_key'")]
     [SerializeField] private string apiKeyResourcePath = "Secrets/openai_api_key";
 
-    // === Back-compat fields expected by LuaPromptUI ===
     [Header("Back-Compat (LuaPromptUI expects these)")]
-    public string objectDisplayName;                        // if empty, falls back to target.name
-    public bool autoApplyToLuaBehaviour = true;             // if false, we won't LoadScript; just store lastGeneratedLua
-    public bool callStartAfterApply = true;                 // kept for compatibility; LuaBehaviour.LoadScript already calls start()
+    public string objectDisplayName;
+    public bool autoApplyToLuaBehaviour = true;
+    public bool callStartAfterApply = true;
 
     [Header("OpenAI")]
-    [SerializeField] private string apiKey;                 // fallback if resource missing
+    [SerializeField] private string apiKey;
     [SerializeField] private string model = "gpt-4.1-mini";
     [Range(0f, 2f)] public float temperature = 0.2f;
 
@@ -45,32 +39,46 @@ public class OpenAILuaGenerator : MonoBehaviour
     [Header("Generation Mode")]
     [SerializeField] private GenerationMode mode = GenerationMode.EditInPlace;
 
-    // NEW: Return message display
     public enum ReturnDisplayMode { AssistantMessage, RawJson, Off }
 
     [Header("Return Message (optional UI)")]
     [SerializeField] private ReturnDisplayMode displayMode = ReturnDisplayMode.AssistantMessage;
-    [Tooltip("Where to print the return message (Assistant text or Raw JSON). Optional.")]
     [SerializeField] private TMP_Text returnMessageText;
-    [Tooltip("Also emit the return message (string) here if you want to route it elsewhere.")]
     public UnityEvent<string> OnReturnMessage;
 
-    // Runtime helpers
+    [Header("Group Broadcast (optional)")]
+    [SerializeField] private bool applyToGroup = false;
+    [SerializeField] private List<GameObject> groupTargets = new List<GameObject>();
+
+    public void EnableGroupBroadcast(bool on)
+    {
+        applyToGroup = on;
+    }
+
+    public void SetGroupTargets(IList<GameObject> targets)
+    {
+        groupTargets.Clear();
+        if (targets == null) return;
+        for (int i = 0; i < targets.Count; i++)
+        {
+            var go = targets[i];
+            if (go != null)
+                groupTargets.Add(go);
+        }
+    }
+
+    public IReadOnlyList<GameObject> GroupTargets => groupTargets;
+
     private string _activeLogId = null;
-    private float  _rtStartTime = 0f;
+    private float _rtStartTime = 0f;
 
-    // Optional manager ref (not required)
-    private PromptedWorldManager pwm;
-
-    // For cases where autoApplyToLuaBehaviour == false
     [NonSerialized] public string lastGeneratedLua = "";
-
-    // For display/inspection
-    [NonSerialized] public string lastAssistantMessage = ""; // same as lastGeneratedLua but kept for clarity
+    [NonSerialized] public string lastAssistantMessage = "";
     [NonSerialized] public string lastRawJson = "";
     [NonSerialized] public string lastError = "";
 
-    // ====== Public API ======
+    // -------- public API --------
+
     public void AssignTarget(GameObject go)
     {
         target = go;
@@ -82,7 +90,6 @@ public class OpenAILuaGenerator : MonoBehaviour
         naturalLanguageIntent = intent;
     }
 
-    // Back-compat: LuaPromptUI calls this
     public void GenerateLuaNow()
     {
         StartGeneration();
@@ -92,22 +99,32 @@ public class OpenAILuaGenerator : MonoBehaviour
     {
         if (string.IsNullOrWhiteSpace(naturalLanguageIntent))
         {
-            Debug.LogWarning("[LuaGen] Empty intent.");
+            ShowReturn("[LuaGen] Empty intent – type a prompt first.", isError: true);
             return;
         }
+
         StartCoroutine(Co_GenerateLua());
     }
 
-    // ====== Request / Response DTOs ======
+    // -------- DTOs --------
     [Serializable] private class Message { public string role; public string content; }
+
     [Serializable] private class ChatRequest
     {
         public string model;
         public float temperature;
         public List<Message> messages;
     }
-    [Serializable] private class Choice   { public Message message; }
-    [Serializable] private class Usage    { public int prompt_tokens; public int completion_tokens; public int total_tokens; }
+
+    [Serializable] private class Choice { public Message message; }
+
+    [Serializable] private class Usage
+    {
+        public int prompt_tokens;
+        public int completion_tokens;
+        public int total_tokens;
+    }
+
     [Serializable] private class ChatResponse
     {
         public string id;
@@ -117,58 +134,60 @@ public class OpenAILuaGenerator : MonoBehaviour
         public List<Choice> choices;
     }
 
-    // ====== Coroutine ======
+    // -------- main coroutine --------
+
     private IEnumerator Co_GenerateLua()
     {
-        // Resolve target / behaviour
-        if (luaBehaviour == null && target != null)
-            luaBehaviour = target.GetComponent<LuaBehaviour>();
-
         if (target == null)
         {
-            ShowReturn("[LuaGen] No target GameObject assigned.", isError:true);
+            ShowReturn("[LuaGen] No target GameObject assigned.", isError: true);
             yield break;
         }
 
-        // Load prompts & API key from Resources (with graceful fallbacks)
+        if (luaBehaviour == null)
+            luaBehaviour = target.GetComponent<LuaBehaviour>();
+
         string basePrompt = LoadTextResource(basePromptResourcePath);
         string template   = LoadTextResource(userPromptTemplateResourcePath);
         string key        = LoadTextResource(apiKeyResourcePath);
 
         if (!string.IsNullOrEmpty(key))
-            apiKey = key.Trim(); // strip whitespace/newlines at ends
+            apiKey = key.Trim();
 
         if (string.IsNullOrEmpty(basePrompt) || string.IsNullOrEmpty(template))
         {
-            ShowReturn($"[LuaGen] Missing base or template. base='{basePromptResourcePath}' template='{userPromptTemplateResourcePath}'", isError:true);
+            ShowReturn($"[LuaGen] Missing base/template text. base='{basePromptResourcePath}' template='{userPromptTemplateResourcePath}'", isError: true);
             yield break;
         }
+
         if (string.IsNullOrEmpty(apiKey))
         {
-            ShowReturn("[LuaGen] Missing API key (Resources or inspector).", isError:true);
+            ShowReturn("[LuaGen] Missing API key (Resources or Inspector).", isError: true);
             yield break;
         }
 
-        // Name used in the prompt
+        // logging
+        ProgramableObject po = target.GetComponent<ProgramableObject>();
         string objName = !string.IsNullOrWhiteSpace(objectDisplayName)
             ? objectDisplayName
-            : (target != null ? target.name : "Target");
+            : target.name;
 
-        // Provide CURRENT_LUA when editing
         string currentLua = "";
         if (mode == GenerationMode.EditInPlace && luaBehaviour != null)
+        {
             currentLua = luaBehaviour.CurrentLua ?? "";
+        }
 
         string userPrompt = BuildUserPrompt(template, naturalLanguageIntent, objName, currentLua);
 
-        // Begin per-object log if available
         _activeLogId = null;
         _rtStartTime = Time.realtimeSinceStartup;
-        ProgramableObject po = target.GetComponent<ProgramableObject>();
-        if (po != null)
-            _activeLogId = po.BeginPromptLog(naturalLanguageIntent, mode.ToString(), model);
 
-        // Build request
+        if (po != null)
+        {
+            _activeLogId = po.BeginPromptLog(naturalLanguageIntent, mode.ToString(), model);
+        }
+
         var reqObj = new ChatRequest
         {
             model = model,
@@ -195,11 +214,12 @@ public class OpenAILuaGenerator : MonoBehaviour
             if (www.result != UnityWebRequest.Result.Success)
             {
                 __RecordFailure(po, $"HTTP error: {www.error}");
-                ShowReturn($"HTTP error: {www.error}", isError:true);
+                ShowReturn($"HTTP error: {www.error}", isError: true);
                 yield break;
             }
 
-            lastRawJson = www.downloadHandler.text; // keep raw
+            lastRawJson = www.downloadHandler.text;
+
             ChatResponse resp = null;
             try
             {
@@ -208,23 +228,35 @@ public class OpenAILuaGenerator : MonoBehaviour
             catch (Exception ex)
             {
                 __RecordFailure(po, $"Parse error: {ex.Message}");
-                ShowReturn($"Parse error: {ex.Message}", isError:true);
+                ShowReturn($"Parse error: {ex.Message}", isError: true);
                 yield break;
             }
 
-            string luaText = ExtractFirstMessageText(resp);
-            if (string.IsNullOrWhiteSpace(luaText))
+            // ---- NEW: clean Lua source before applying ----
+            string rawLuaText = ExtractFirstMessageText(resp);
+            if (string.IsNullOrWhiteSpace(rawLuaText))
             {
                 __RecordFailure(po, "Empty Lua in response");
-                ShowReturn("Empty Lua in response", isError:true);
+                ShowReturn("Empty Lua in response", isError: true);
                 yield break;
             }
 
-            // Decide whether to apply or just store
-            lastAssistantMessage = luaText;
+            // Keep raw assistant message for debugging
+            lastAssistantMessage = rawLuaText;
+
+            // Clean up quotes, ``` fences, stray backticks, junk before first 'function'
+            string luaText = LuaSourceCleaner.Clean(rawLuaText);
+
+            if (string.IsNullOrWhiteSpace(luaText))
+            {
+                __RecordFailure(po, "Lua became empty after cleaning");
+                ShowReturn("Lua became empty after cleaning", isError: true);
+                yield break;
+            }
+
             lastGeneratedLua = luaText;
 
-            // Show (Assistant or Raw) based on mode
+            // optional display
             if (displayMode != ReturnDisplayMode.Off)
             {
                 if (displayMode == ReturnDisplayMode.AssistantMessage)
@@ -235,12 +267,10 @@ public class OpenAILuaGenerator : MonoBehaviour
 
             if (!autoApplyToLuaBehaviour)
             {
-                // Not applying; finalize log success with the generated script
                 if (po != null && !string.IsNullOrEmpty(_activeLogId))
                 {
                     float dt = Time.realtimeSinceStartup - _rtStartTime;
-                    // If usage exists, include tokens
-                    int inTok = resp?.usage?.prompt_tokens ?? 0;
+                    int inTok  = resp?.usage?.prompt_tokens     ?? 0;
                     int outTok = resp?.usage?.completion_tokens ?? 0;
                     po.CompletePromptLogSuccess(_activeLogId, luaText, dt, inTok, outTok);
                     _activeLogId = null;
@@ -248,50 +278,83 @@ public class OpenAILuaGenerator : MonoBehaviour
                 yield break;
             }
 
-            // Apply to LuaBehaviour (required for live updates)
+            // ensure main target has LuaBehaviour
             if (luaBehaviour == null)
             {
                 luaBehaviour = target.GetComponent<LuaBehaviour>();
                 if (luaBehaviour == null)
                 {
-                    __RecordFailure(po, "No LuaBehaviour on target to apply the script.");
-                    ShowReturn("No LuaBehaviour on target to apply the script.", isError:true);
-                    yield break;
+                    // auto-add component if missing
+                    luaBehaviour = target.AddComponent<LuaBehaviour>();
                 }
             }
 
             try
             {
-                // Note: LuaBehaviour.LoadScript() does not auto-call start() in the newer version.
-                // If your LuaBehaviour still auto-calls start(), that's fine; this remains compatible.
+                // apply to main target (CLEANED luaText)
                 luaBehaviour.LoadScript(luaText);
+                if (callStartAfterApply)
+                {
+                    luaBehaviour.StartRun();
+                }
 
                 if (po != null && !string.IsNullOrEmpty(_activeLogId))
                 {
                     float dt = Time.realtimeSinceStartup - _rtStartTime;
-                    int inTok = resp?.usage?.prompt_tokens ?? 0;
+                    int inTok  = resp?.usage?.prompt_tokens     ?? 0;
                     int outTok = resp?.usage?.completion_tokens ?? 0;
                     po.CompletePromptLogSuccess(_activeLogId, luaText, dt, inTok, outTok);
                     _activeLogId = null;
+                }
+
+                // group broadcast
+                if (applyToGroup && groupTargets != null && groupTargets.Count > 0)
+                {
+                    Debug.Log("[LuaGen] Applying Lua to group of " + groupTargets.Count + " objects.");
+                    for (int i = 0; i < groupTargets.Count; i++)
+                    {
+                        var go = groupTargets[i];
+                        if (go == null) continue;
+                        if (go == target) continue; // already done
+
+                        try
+                        {
+                            var otherLb = go.GetComponent<LuaBehaviour>();
+                            if (otherLb == null)
+                                otherLb = go.AddComponent<LuaBehaviour>();
+
+                            otherLb.LoadScript(luaText);
+                            if (callStartAfterApply)
+                            {
+                                otherLb.StartRun();
+                            }
+                        }
+                        catch (Exception ex2)
+                        {
+                            Debug.LogError("[LuaGen] Failed to apply group Lua to " + go.name + ": " + ex2.Message);
+                        }
+                    }
                 }
             }
             catch (Exception ex)
             {
                 __RecordFailure(po, $"Apply error: {ex.Message}");
-                ShowReturn($"Apply error: {ex.Message}", isError:true);
+                ShowReturn($"Apply error: {ex.Message}", isError: true);
                 yield break;
             }
         }
     }
 
-    // ====== Helpers ======
+    // -------- helpers --------
+
     private static string BuildUserPrompt(string template, string intent, string objectName, string currentLua)
     {
         string name = string.IsNullOrWhiteSpace(objectName) ? "Target" : objectName.Trim();
         string want = (intent ?? "").Trim();
         string cur  = (currentLua ?? "").Trim();
+
         return template.Replace("{OBJECT_NAME}", name)
-                       .Replace("{INTENT}", want)
+                       .Replace("{INTENT}",      want)
                        .Replace("{CURRENT_LUA}", cur);
     }
 
@@ -323,18 +386,85 @@ public class OpenAILuaGenerator : MonoBehaviour
 
     private void ShowReturn(string text, bool isError = false)
     {
-        // Store last error/message
         if (isError) lastError = text;
 
-        // Print to optional UI
         if (returnMessageText != null)
             returnMessageText.text = text ?? "";
 
-        // Fire event so you can route elsewhere
         OnReturnMessage?.Invoke(text ?? "");
 
-        // Also log to console
         if (isError) Debug.LogError("[LuaGen] " + text);
         else Debug.Log("[LuaGen] " + text);
+    }
+
+    // -------- Lua source cleaner (envelope only, does NOT change code semantics) --------
+
+    private static class LuaSourceCleaner
+    {
+        public static string Clean(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return string.Empty;
+
+            // 1. Trim whitespace
+            var s = raw.Trim();
+
+            // 2. Strip outer quotes if entire payload is wrapped in "..." or '...'
+            if ((s.StartsWith("\"") && s.EndsWith("\"")) ||
+                (s.StartsWith("'") && s.EndsWith("'")))
+            {
+                // Only unwrap if it looks like code (has newline or 'function')
+                if (s.Length > 2 && (s.Contains("\n") || s.Contains("function")))
+                {
+                    s = s.Substring(1, s.Length - 2).Trim();
+                }
+            }
+
+            // 3. Remove leading/trailing markdown fences and stray backticks
+            var lines = s.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var list = new List<string>(lines);
+
+            // Strip leading fence-like lines
+            while (list.Count > 0)
+            {
+                var first = list[0].Trim();
+                if (first == "```" ||
+                    first.Equals("```lua", StringComparison.OrdinalIgnoreCase) ||
+                    first.Equals("```Lua", StringComparison.OrdinalIgnoreCase) ||
+                    first == "`")
+                {
+                    list.RemoveAt(0);
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            // Strip trailing fence-like lines
+            while (list.Count > 0)
+            {
+                var last = list[list.Count - 1].Trim();
+                if (last == "```" || last == "`")
+                {
+                    list.RemoveAt(list.Count - 1);
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            s = string.Join("\n", list).Trim();
+
+            // 4. Last resort: if there is junk before first 'function', drop it
+            int idx = s.IndexOf("function", StringComparison.Ordinal);
+            if (idx > 0)
+            {
+                s = s.Substring(idx).TrimStart();
+            }
+
+            return s;
+        }
     }
 }

@@ -680,15 +680,15 @@ GameObject:
   - component: {fileID: 8064228408395123609}
   - component: {fileID: 465829358142508102}
   - component: {fileID: 7703813915453989559}
-  - component: {fileID: 3978142420223599528}
   - component: {fileID: 2166428522671695660}
   - component: {fileID: 4841036895249162438}
   - component: {fileID: 6842033889762767591}
   - component: {fileID: 918196740110979837}
   - component: {fileID: -4033489437336678575}
+  - component: {fileID: -256418291513411979}
   m_Layer: 0
   m_Name: ProgramableObject
-  m_TagString: Untagged
+  m_TagString: Selectable
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -785,27 +785,6 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &3978142420223599528
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7692451994609705636}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!54 &2166428522671695660
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -943,9 +922,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   inlineScript: 
   scriptAsset: {fileID: 0}
-  runOnStart: 1
-  runEnabled: 1
+  runOnStart: 0
+  runEnabled: 0
   resetPositionOnStop: 1
+  makeRigidbodyKinematicOnStop: 1
   addRigidbodyIfMissing: 1
   rbKinematicDefault: 1
   rbUseGravityDefault: 0
@@ -956,6 +936,27 @@ MonoBehaviour:
   addBoxColliderIfMissing: 0
   exposeProgramableProxy: 1
   _currentLuaPreview: 
+--- !u!65 &-256418291513411979
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7692451994609705636}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.99999994, y: 0.99999994, z: 0.99999994}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &8102332530202665709
 GameObject:
   m_ObjectHideFlags: 0
@@ -1031,7 +1032,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2140d2b457bea84881488302059889b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _collider: {fileID: 3978142420223599528}
+  _collider: {fileID: -256418291513411979}
 --- !u!1 &9144633829916927407
 GameObject:
   m_ObjectHideFlags: 0

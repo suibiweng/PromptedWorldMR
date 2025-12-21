@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -7,6 +8,13 @@ public class LayoutRunnerUI : MonoBehaviour
     [Header("Core Reference")]
     [Tooltip("The LayoutRunner that controls the LLM layout workflow.")]
     public LayoutRunner layoutRunner;
+
+    [Header("Selection Sources (optional)")]
+    [Tooltip("PromptedWorldManager that tracks click-based selections.")]
+    public PromptedWorldManager promptedWorldManager;
+
+    [Tooltip("Lasso selector that tracks MR lasso selections.")]
+    public LassoSelectorMR3D lassoSelector;
 
     [Header("TMPro UI References")]
     [Tooltip("Single prompt input field used for both initial and edit prompts.")]
@@ -34,15 +42,10 @@ public class LayoutRunnerUI : MonoBehaviour
     [Tooltip("If true, also print UI events to the Unity Console.")]
     public bool verboseLogging = true;
 
-    // internal
     private string _logBuffer = "";
     private string _lastSeenLayoutName = null;
 
-    [System.Serializable]
-    private class LayoutNameOnly
-    {
-        public string layout_name;
-    }
+    // -------------------------------
 
     private void Start()
     {
@@ -52,17 +55,21 @@ public class LayoutRunnerUI : MonoBehaviour
             return;
         }
 
-        // Hook up button in code (so you don't forget in Inspector)
-        if (submitButton != null)
+        if (promptedWorldManager == null)
+            promptedWorldManager = FindObjectOfType<PromptedWorldManager>();
+
+        if (lassoSelector == null)
+            lassoSelector = FindObjectOfType<LassoSelectorMR3D>();
+
+        if (verboseLogging)
         {
-            submitButton.onClick.AddListener(OnApplyPromptClicked);
-        }
-        else
-        {
-            Debug.LogWarning("[LayoutRunnerUI] submitButton is not assigned. Assign a Button in the Inspector.");
+            Debug.Log("[LayoutRunnerUI] pwm = " + (promptedWorldManager ? promptedWorldManager.gameObject.name : "null") +
+                      ", lasso = " + (lassoSelector ? lassoSelector.gameObject.name : "null"));
         }
 
-        // Initialize prompt field from runner (if any text is already there)
+        if (submitButton != null)
+            submitButton.onClick.AddListener(OnApplyPromptClicked);
+
         if (promptInput != null)
         {
             if (!string.IsNullOrWhiteSpace(layoutRunner.initialLayoutPrompt))
@@ -83,13 +90,10 @@ public class LayoutRunnerUI : MonoBehaviour
         RefreshStatusLabel();
     }
 
-    // ------------- PUBLIC UI HOOK (Submit Button) -------------
+    // -------------------------------
+    // MAIN BUTTON
+    // -------------------------------
 
-    /// <summary>
-    /// Called by the Submit button: applies the current prompt.
-    /// If there is no existing layout, calls GenerateLayout().
-    /// If there is an existing layout, calls EditCurrentLayout().
-    /// </summary>
     public void OnApplyPromptClicked()
     {
         if (layoutRunner == null)
@@ -108,9 +112,11 @@ public class LayoutRunnerUI : MonoBehaviour
             return;
         }
 
-        // Push this prompt into both initial and edit fields on the runner
         layoutRunner.initialLayoutPrompt = prompt;
         layoutRunner.editLayoutPrompt    = prompt;
+
+        // Build union of current selection (lasso + click) and push into LayoutRunner
+        PushCurrentSelectionIntoLayoutRunner();
 
         bool hasExistingLayout = HasExistingLayout();
 
@@ -134,7 +140,99 @@ public class LayoutRunnerUI : MonoBehaviour
         RefreshStatusLabel();
     }
 
-    // ------------- LABEL UPDATERS -------------
+    /// <summary>
+    /// Builds the union of:
+    /// - Lasso selection (if any)
+    /// - PromptedWorldManager click selection (if any)
+    /// and writes it into layoutRunner.existingObjectsOverride.
+    /// </summary>
+    private void PushCurrentSelectionIntoLayoutRunner()
+    {
+        if (layoutRunner == null) return;
+
+        var union = GetCurrentSelectionUnion(out int lassoCount, out int clickCount);
+
+        if (union.Count == 0)
+        {
+            layoutRunner.existingObjectsOverride = null;
+            if (verboseLogging)
+            {
+                Debug.Log("[LayoutRunnerUI] PushCurrentSelectionIntoLayoutRunner: selection empty (lasso="
+                          + lassoCount + ", click=" + clickCount + ")");
+            }
+            return;
+        }
+
+        var list = new List<Transform>();
+        foreach (var go in union)
+        {
+            if (go != null) list.Add(go.transform);
+        }
+
+        layoutRunner.existingObjectsOverride = list.ToArray();
+
+        if (verboseLogging)
+        {
+            string firstName = list.Count > 0 && list[0] != null ? list[0].name : "(null)";
+            Debug.Log("[LayoutRunnerUI] PushCurrentSelectionIntoLayoutRunner: total=" + list.Count +
+                      " (lasso=" + lassoCount + ", click=" + clickCount + "), first=" + firstName);
+        }
+    }
+
+    /// <summary>
+    /// Returns a deduplicated list of currently selected GameObjects from:
+    /// - LassoSelectorMR3D (if present)
+    /// - PromptedWorldManager (if present)
+    /// </summary>
+    private List<GameObject> GetCurrentSelectionUnion(out int lassoCount, out int clickCount)
+    {
+        var result = new List<GameObject>();
+        var seen = new HashSet<GameObject>();
+        lassoCount = 0;
+        clickCount = 0;
+
+        // 1) Lasso selection
+        if (lassoSelector != null)
+        {
+            var lassoSel = lassoSelector.GetCurrentSelection();
+            if (lassoSel != null)
+            {
+                for (int i = 0; i < lassoSel.Count; i++)
+                {
+                    var go = lassoSel[i];
+                    if (go != null && seen.Add(go))
+                    {
+                        result.Add(go);
+                    }
+                }
+                lassoCount = lassoSel.Count;
+            }
+        }
+
+        // 2) Click selection from PromptedWorldManager
+        if (promptedWorldManager != null)
+        {
+            var clickSel = promptedWorldManager.GetSelectedObjects();
+            if (clickSel != null)
+            {
+                for (int i = 0; i < clickSel.Count; i++)
+                {
+                    var go = clickSel[i];
+                    if (go != null && seen.Add(go))
+                    {
+                        result.Add(go);
+                    }
+                }
+                clickCount = clickSel.Count;
+            }
+        }
+
+        return result;
+    }
+
+    // -------------------------------
+    // LABELS
+    // -------------------------------
 
     private void RefreshAllLabels()
     {
@@ -170,42 +268,39 @@ public class LayoutRunnerUI : MonoBehaviour
         }
     }
 
-private void RefreshSelectedObjectsLabel()
-{
-    if (layoutRunner == null || selectedObjectsLabel == null) return;
-
-    string text = "Selected: (none)";
-
-    // Prefer overrides (what you set from LassoToLayoutRunnerBridge, etc.)
-    Transform[] arr = layoutRunner.existingObjectsOverride;
-
-    // If no override, fall back to what the applier is actually using
-    if ((arr == null || arr.Length == 0) && layoutRunner.layoutApplier != null)
+    private void RefreshSelectedObjectsLabel()
     {
-        arr = layoutRunner.layoutApplier.existingObjects;
-    }
+        if (selectedObjectsLabel == null) return;
 
-    if (arr != null && arr.Length > 0)
-    {
-        string firstName = arr[0] != null ? arr[0].name : "(null)";
-        if (arr.Length == 1)
+        int lassoCount, clickCount;
+        var union = GetCurrentSelectionUnion(out lassoCount, out clickCount);
+
+        if (union.Count == 0)
         {
+            selectedObjectsLabel.text = "Selected: (none)";
+            if (verboseLogging)
+            {
+                Debug.Log("[LayoutRunnerUI] RefreshSelectedObjectsLabel: none selected (lasso="
+                          + lassoCount + ", click=" + clickCount + ")");
+            }
+            return;
+        }
+
+        string firstName = union[0] != null ? union[0].name : "(null)";
+        string text;
+        if (union.Count == 1)
             text = $"Selected: {firstName}";
-        }
         else
-        {
-            text = $"Selected: {firstName} (+{arr.Length - 1} more)";
-        }
+            text = $"Selected: {firstName} (+{union.Count - 1} more)";
+
+        selectedObjectsLabel.text = text;
 
         if (verboseLogging)
         {
-            Debug.Log($"[LayoutRunnerUI] Selected objects count = {arr.Length}, first = {firstName}");
+            Debug.Log("[LayoutRunnerUI] RefreshSelectedObjectsLabel: total=" + union.Count +
+                      " (lasso=" + lassoCount + ", click=" + clickCount + "), first=" + firstName);
         }
     }
-
-    selectedObjectsLabel.text = text;
-}
-
 
     private void RefreshStatusLabel()
     {
@@ -213,13 +308,15 @@ private void RefreshSelectedObjectsLabel()
         statusLabel.text = $"Status: {layoutRunner.status}";
     }
 
+    // -------------------------------
+    // LOGGING
+    // -------------------------------
+
     private void RefreshLogLabel()
     {
         if (logLabel == null) return;
         logLabel.text = _logBuffer;
     }
-
-    // ------------- LOGGING -------------
 
     private void AppendLog(string line)
     {

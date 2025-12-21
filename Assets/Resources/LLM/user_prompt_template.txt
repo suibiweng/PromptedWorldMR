@@ -20,6 +20,22 @@ Transform access (preferred):
   self.transform.position = { x = p.x, y = p.y, z = p.z }
 - Also valid: self.transform.localPosition, self.transform.localScale, self.transform.eulerAngles
 
+Collision access (very important):
+- self is always the GameObject with LuaBehaviour + Rigidbody (usually the parent).
+- Child colliders are treated as a compound collider of the parent.
+- In on_collision(self, col):
+  - Use self.transform.name (or ProgramableObject/GetId) for this object’s name.
+  - Use col:GetRootName() for the OTHER object’s top-level parent name.
+  - Do NOT assume child collider names; always use the root name when matching e.g. DESK, WALL, FLOOR.
+- Example pattern:
+  function on_collision(self, col)
+    local my_name = self.transform.name
+    local other_root = col:GetRootName()
+    if other_root == "DESK" then
+      if self.particles then self.particles:Play() end
+    end
+  end
+
 DOTween usage:
 - Create tweens in start(self) or on_trigger(self, other), not every frame in update.
 - Examples:
@@ -31,4 +47,9 @@ Rules:
 - Use update(self, deltaTime) for continuous logic; on_trigger/on_collision for events.
 - Don’t reference Time.deltaTime directly; use deltaTime parameter.
 - Durations in seconds; vectors are tables {x=..., y=..., z=...}.
-- Keep function names exactly as specified (lowercase).
+- Names you set (transform.name or gameObject:SetName) will automatically be uppercased and spaces will be replaced with underscores.
+- Do NOT add any animation or DOTween calls unless the user explicitly asks for movement/animation/effects.
+- When enabling gravity or applying forces/impulses/velocities on a Rigidbody, the runtime automatically turns off isKinematic for you.
+- Do NOT call SetIsKinematic(...) or SetKinematic(...) unless the user explicitly asks for "kinematic", "freeze in place", or similar behavior.
+
+
