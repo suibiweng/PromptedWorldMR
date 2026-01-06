@@ -1,262 +1,166 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
 
-/// <summary>
-/// Service that sends layout prompts to OpenAI and returns a JSON layout string.
-/// </summary>
+[DisallowMultipleComponent]
 public class LayoutLLMService : MonoBehaviour
 {
-    [Header("API Settings")]
-    [Tooltip("OpenAI API base URL for chat completions.")]
-    public string chatUrl = "https://api.openai.com/v1/chat/completions";
+    [Header("OpenAI")]
+    [Tooltip("Loaded from Resources/Secrets/openai_api_key if empty")]
+    public string apiKey;
+    public string model = "gpt-4.1-mini";
+    public float temperature = 0.2f;
 
-    [Tooltip("Model name, e.g., 'gpt-4.1-mini' or 'gpt-4.1'.")]
-    public string modelName = "gpt-4.1-mini";
-
-    [Tooltip("Path inside Resources folder to a text asset containing your API key.\nExample: 'Secrets/openai_api_key' (no extension).")]
-    public string apiKeyResourcePath = "Secrets/openai_api_key";
-
-    [Tooltip("Max tokens for the completion. Exposed publicly so you can tune it in the Inspector.")]
-    public int maxTokens = 10000;
-
-    [Tooltip("Optional: log full request/response JSON to the console.")]
-    public bool verboseLogging = true;
-
-    private string _apiKey;
-
-    /// <summary>
-    /// Last raw response from the LLM (for debugging).
-    /// </summary>
-    [TextArea(3, 20)]
-    public string lastRawResponse;
-
-    private void Awake()
+    void Awake()
     {
-        EnsureApiKeyLoaded();
-    }
-
-    private void EnsureApiKeyLoaded()
-    {
-        if (!string.IsNullOrEmpty(_apiKey)) return;
-
-        TextAsset keyAsset = Resources.Load<TextAsset>(apiKeyResourcePath);
-        if (keyAsset == null)
+        if (string.IsNullOrEmpty(apiKey))
         {
-            Debug.LogError($"[LayoutLLMService] Failed to load API key from Resources at '{apiKeyResourcePath}'. " +
-                           "Create a TextAsset there with your API key.");
-            return;
-        }
-
-        _apiKey = keyAsset.text.Trim();
-        if (verboseLogging)
-        {
-            Debug.Log($"[LayoutLLMService] Loaded API key from Resources: {apiKeyResourcePath}");
-        }
-    }
-
-    /// <summary>
-    /// System prompt that defines the JSON schema and scale behavior.
-    /// </summary>
-    private string GetSystemPrompt()
-    {
-        return
-            "You are a layout planner for Unity.\n" +
-            "You MUST respond with only a single JSON object and nothing else.\n" +
-            "The JSON must follow this schema:\n" +
-            "{\n" +
-            "  \"layout_name\": \"string\",\n" +
-            "  \"space\": \"local\",\n" +
-            "  \"instances\": [\n" +
-            "    {\n" +
-            "      \"id\": \"obj_0\",\n" +
-            "      \"position\": { \"x\": 0.0, \"y\": 0.0, \"z\": 0.0 },\n" +
-            "      \"rotationEuler\": { \"x\": 0.0, \"y\": 0.0, \"z\": 0.0 },\n" +
-            "      \"scale\": { \"x\": 1.0, \"y\": 1.0, \"z\": 1.0 }\n" +
-            "    }\n" +
-            "  ]\n" +
-            "}\n" +
-            "- Do NOT include ```json fences.\n" +
-            "- Do NOT include explanations.\n" +
-            "- Keep the JSON as short as possible while valid.\n" +
-            "- `space` must be \"local\".\n" +
-            "- `position` is typically on the XZ plane (y=0) unless vertical stacking is requested.\n" +
-            "- `rotationEuler` uses degrees, Unity's X,Y,Z order.\n" +
-            "- IMPORTANT: `scale` is a LOCAL SCALE MULTIPLIER.\n" +
-            "  - By default, use { \"x\":1, \"y\":1, \"z\":1 } for all instances.\n" +
-            "  - ONLY change scale if the user explicitly asks to change object size (bigger, smaller, taller, etc.).\n" +
-            "- Use ids like \"obj_0\", \"obj_1\", \"obj_2\", etc. for each instance.\n";
-    }
-
-    // ---------- Serializable request/response types ----------
-
-    [Serializable]
-    private class ChatMessage
-    {
-        public string role;
-        public string content;
-    }
-
-    [Serializable]
-    private class ChatRequest
-    {
-        public string model;
-        public ChatMessage[] messages;
-        public float temperature;
-        public int max_tokens;
-    }
-
-    [Serializable]
-    private class ChatCompletionResponse
-    {
-        [Serializable]
-        public class ChoiceMessage
-        {
-            public string role;
-            public string content;
-        }
-
-        [Serializable]
-        public class Choice
-        {
-            public int index;
-            public ChoiceMessage message;
-            public string finish_reason;
-        }
-
-        public string id;
-        public string model;
-        public Choice[] choices;
-    }
-
-    /// <summary>
-    /// Sends a prompt to the LLM and returns a JSON layout string via callback.
-    /// </summary>
-    public IEnumerator RequestLayoutJson(string userPrompt, Action<string> onJson, Action<string> onError)
-    {
-        EnsureApiKeyLoaded();
-        if (string.IsNullOrEmpty(_apiKey))
-        {
-            string err = "[LayoutLLMService] No API key loaded.";
-            Debug.LogError(err);
-            onError?.Invoke(err);
-            yield break;
-        }
-
-        if (string.IsNullOrWhiteSpace(modelName))
-        {
-            string err = "[LayoutLLMService] modelName is empty. Set it in the Inspector (e.g., 'gpt-4.1-mini').";
-            Debug.LogError(err);
-            onError?.Invoke(err);
-            yield break;
-        }
-
-        if (verboseLogging)
-        {
-            Debug.Log("[LayoutLLMService] Using URL: " + chatUrl);
-        }
-
-        // Build request object
-        var request = new ChatRequest
-        {
-            model = modelName,
-            messages = new[]
+            TextAsset keyAsset = Resources.Load<TextAsset>("Secrets/openai_api_key");
+            if (keyAsset == null)
             {
-                new ChatMessage
-                {
-                    role = "system",
-                    content = GetSystemPrompt()
-                },
-                new ChatMessage
-                {
-                    role = "user",
-                    content = userPrompt
-                }
-            },
-            temperature = 0.1f,
-            max_tokens = Mathf.Max(1, maxTokens) // ensure > 0 but otherwise use whatever you set
+                Debug.LogError("[LayoutLLMService] Missing API key at Resources/Secrets/openai_api_key");
+            }
+            else
+            {
+                apiKey = keyAsset.text.Trim();
+            }
+        }
+    }
+
+    // ================================
+    // PUBLIC API
+    // ================================
+    public IEnumerator RequestLayoutJson(
+        string userPrompt,
+        List<string> allowedIds,
+        Action<string> onJson,
+        Action<string> onError
+    )
+    {
+        string systemPrompt = GetSystemPrompt(allowedIds);
+
+        var messages = new[]
+        {
+            new Message { role = "system", content = systemPrompt },
+            new Message { role = "user", content = userPrompt }
         };
 
-        string jsonBody = JsonUtility.ToJson(request);
-
-        if (verboseLogging)
-        {
-            Debug.Log("[LayoutLLMService] Chat request body: " + jsonBody);
-        }
-
-        using (UnityWebRequest req = new UnityWebRequest(chatUrl, "POST"))
-        {
-            byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
-            req.uploadHandler = new UploadHandlerRaw(bodyRaw);
-            req.downloadHandler = new DownloadHandlerBuffer();
-            req.SetRequestHeader("Content-Type", "application/json");
-            req.SetRequestHeader("Authorization", "Bearer " + _apiKey);
-
-            yield return req.SendWebRequest();
-
-            if (req.result != UnityWebRequest.Result.Success)
-            {
-                string err = "[LayoutLLMService] Error: " + req.error + "\n" + req.downloadHandler.text;
-                Debug.LogError(err);
-                onError?.Invoke(err);
-                yield break;
-            }
-
-            string raw = req.downloadHandler.text;
-            lastRawResponse = raw;
-
-            if (verboseLogging)
-            {
-                Debug.Log("[LayoutLLMService] Raw chat response: " + raw);
-            }
-
-            string extractedJson = ExtractJsonFromChatResponse(raw);
-            if (string.IsNullOrEmpty(extractedJson))
-            {
-                string err = "[LayoutLLMService] Failed to extract JSON from response.";
-                Debug.LogError(err);
-                onError?.Invoke(err);
-                yield break;
-            }
-
-            if (verboseLogging)
-            {
-                Debug.Log("[LayoutLLMService] Extracted JSON:\n" + extractedJson);
-            }
-
-            onJson?.Invoke(extractedJson);
-        }
+        yield return Send(messages, onJson, onError);
     }
 
-    /// <summary>
-    /// Extracts the assistant's message.content and slices out the JSON object.
-    /// </summary>
-    private string ExtractJsonFromChatResponse(string raw)
+    // ================================
+    // PROMPT (CRITICAL)
+    // ================================
+    private string GetSystemPrompt(List<string> allowedIds)
     {
-        try
-        {
-            ChatCompletionResponse resp = JsonUtility.FromJson<ChatCompletionResponse>(raw);
-            if (resp == null || resp.choices == null || resp.choices.Length == 0)
-                return null;
+        return
+$@"You are a spatial layout assistant for Mixed Reality.
 
-            string content = resp.choices[0].message.content;
-            if (string.IsNullOrEmpty(content))
-                return null;
+=== CRITICAL CONSTRAINT ===
+You MUST use ONLY the instance ids listed below.
+- Do NOT invent new ids
+- Do NOT rename
+- Case-sensitive
+- Output EXACTLY {allowedIds.Count} instances
 
-            int firstBrace = content.IndexOf('{');
-            int lastBrace = content.LastIndexOf('}');
-            if (firstBrace < 0 || lastBrace < firstBrace)
-                return null;
+Allowed instance ids:
+{string.Join("\n", allowedIds.Select(id => "- " + id))}
 
-            string json = content.Substring(firstBrace, lastBrace - firstBrace + 1);
-            return json.Trim();
-        }
-        catch (Exception e)
-        {
-            Debug.LogError("[LayoutLLMService] Exception in ExtractJsonFromChatResponse: " + e);
-            return null;
-        }
+=== MIXED REALITY CONTEXT ===
+- Unity units are meters (1 unit ≈ 1 meter)
+- Objects already exist in the scene
+- You are ONLY repositioning and rescaling them
+
+=== SCALE RULES ===
+- scale is ABSOLUTE local scale
+- Default object scale in this project is usually 0.2, 0.2, 0.2
+- Keep scale close to default unless resizing is clearly implied
+- Never reuse one object's scale for another
+
+=== OUTPUT RULES ===
+- Output ONLY valid JSON
+- No markdown
+- No explanations
+
+=== JSON FORMAT ===
+{{
+  ""layout_name"": string,
+  ""space"": ""local"",
+  ""instances"": [
+    {{
+      ""id"": string,
+      ""position"": {{ ""x"": float, ""y"": float, ""z"": float }},
+      ""rotationEuler"": {{ ""x"": float, ""y"": float, ""z"": float }},
+      ""scale"": {{ ""x"": float, ""y"": float, ""z"": float }}
+    }}
+  ]
+}}";
     }
+
+    // ================================
+    // NETWORK
+    // ================================
+    private IEnumerator Send(
+        Message[] messages,
+        Action<string> onJson,
+        Action<string> onError
+    )
+    {
+        var req = new ChatRequest
+        {
+            model = model,
+            temperature = temperature,
+            messages = messages
+        };
+
+        string json = JsonUtility.ToJson(req);
+
+        using var www = new UnityWebRequest(
+            "https://api.openai.com/v1/chat/completions",
+            "POST"
+        );
+
+        www.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
+        www.downloadHandler = new DownloadHandlerBuffer();
+        www.SetRequestHeader("Content-Type", "application/json");
+        www.SetRequestHeader("Authorization", "Bearer " + apiKey);
+
+        yield return www.SendWebRequest();
+
+        if (www.result != UnityWebRequest.Result.Success)
+        {
+            onError?.Invoke(www.error);
+            yield break;
+        }
+
+        var resp = JsonUtility.FromJson<ChatResponse>(www.downloadHandler.text);
+        if (resp == null || resp.choices == null || resp.choices.Count == 0)
+        {
+            onError?.Invoke("Invalid response");
+            yield break;
+        }
+
+        // ================================
+        // DEBUG: PRINT RAW RETURN JSON
+        // ================================
+        string returnedJson = resp.choices[0].message.content;
+        Debug.Log(
+            "[LayoutLLMService] 🧾 RAW RETURN JSON FROM OPENAI:\n" +
+            returnedJson
+        );
+
+        onJson?.Invoke(returnedJson);
+    }
+
+    // ================================
+    // DTOs
+    // ================================
+    [Serializable] private class Message { public string role; public string content; }
+    [Serializable] private class ChatRequest { public string model; public float temperature; public Message[] messages; }
+    [Serializable] private class Choice { public Message message; }
+    [Serializable] private class ChatResponse { public List<Choice> choices; }
 }

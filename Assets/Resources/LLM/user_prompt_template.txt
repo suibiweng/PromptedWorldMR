@@ -1,6 +1,9 @@
 Task: Generate Lua that controls a Unity GameObject using MoonSharp + DOTween proxies.
 GameObject display name: {OBJECT_NAME}
 
+SCENE_CONTEXT (optional; may be empty):
+{SCENE_CONTEXT}
+
 User intent:
 {INTENT}
 
@@ -35,6 +38,33 @@ Collision access (very important):
       if self.particles then self.particles:Play() end
     end
   end
+IMPORTANT: Matching objects with multiple runtime instances
+
+- Scene objects may expand into multiple runtime instances by appending numeric suffixes.
+  Example:
+    Planner ID: OBJECT_NAME
+    Runtime names: OBJECT_NAME_1, OBJECT_NAME_2, OBJECT_NAME_3, ...
+
+- Therefore, NEVER rely on exact string equality when matching object names in collisions.
+
+  This is WRONG:
+    if other_root == "OBJECT_NAME" then ...
+
+- You MUST use prefix-based or pattern-based matching to identify object categories.
+
+- Preferred pattern-based prefix match (Lua string pattern):
+    if string.match(other_root, "^OBJECT_NAME") then
+        -- matches OBJECT_NAME, OBJECT_NAME_1, OBJECT_NAME_12, etc.
+    end
+
+- Alternative acceptable prefix check:
+    if string.sub(other_root, 1, #OBJECT_NAME) == OBJECT_NAME then
+        ...
+    end
+
+- Always obtain the other object’s name using:
+    local other_root = col:GetRootName()
+
 
 DOTween usage:
 - Create tweens in start(self) or on_trigger(self, other), not every frame in update.
@@ -51,5 +81,4 @@ Rules:
 - Do NOT add any animation or DOTween calls unless the user explicitly asks for movement/animation/effects.
 - When enabling gravity or applying forces/impulses/velocities on a Rigidbody, the runtime automatically turns off isKinematic for you.
 - Do NOT call SetIsKinematic(...) or SetKinematic(...) unless the user explicitly asks for "kinematic", "freeze in place", or similar behavior.
-
-
+- Objects may have multiple runtime instances; do NOT rely on exact-name equality to identify other objects. Prefer prefix/pattern/role-based matching when identifying categories of objects.

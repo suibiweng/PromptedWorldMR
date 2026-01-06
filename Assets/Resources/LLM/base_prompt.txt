@@ -179,4 +179,3 @@ function on_collision(self, col)
 - When the user just asks for gravity, force, bouncing, or physics behavior:
   - Use SetUseGravity / AddForce / AddImpulse / SetVelocity
   - DO NOT add extra SetIsKinematic / SetKinematic calls.
-s
