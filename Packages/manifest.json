@@ -1,7 +1,6 @@
 {
   "dependencies": {
-    "com.meta.xr.depthapi": "https://github.com/oculus-samples/Unity-DepthAPI.git?path=/Packages/com.meta.xr.depthapi",
-    "com.meta.xr.sdk.all": "78.0.0",
+    "com.meta.xr.sdk.all": "83.0.1",
     "com.unity.2d.sprite": "1.0.0",
     "com.unity.collab-proxy": "2.9.3",
     "com.unity.feature.development": "1.0.2",
@@ -10,7 +9,8 @@
     "com.unity.timeline": "1.8.9",
     "com.unity.ugui": "2.0.0",
     "com.unity.visualscripting": "1.9.7",
-    "com.unity.xr.management": "4.5.2",
+    "com.unity.xr.management": "4.5.4",
+    "com.unity.xr.meta-openxr": "2.3.0",
     "com.unity.xr.openxr": "1.15.1",
     "moonsharp": "https://github.com/k0dep/MoonSharp.git#2.0.0",
     "com.unity.modules.accessibility": "1.0.0",

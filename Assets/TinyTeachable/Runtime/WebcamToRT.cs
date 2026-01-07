@@ -1,5 +1,5 @@
 using UnityEngine;
-using PassthroughCameraSamples; // for WebCamTextureManager
+//using PassthroughCameraSamples; // for WebCamTextureManager
 
 [DisallowMultipleComponent]
 public class WebcamToRT : MonoBehaviour
@@ -18,8 +18,7 @@ public class WebcamToRT : MonoBehaviour
     public int webcamFPS    = 30;
 
     [Header("Passthrough (Quest)")]
-    public WebCamTextureManager webCamTextureManager; // assign when using passthrough
-
+    public GameObject webCamTextureManager; // assign when using passthrough
     private WebCamTexture webcamTex;
     private Texture passthroughTex;         // cached reference to manager’s texture
     private bool warnedNoManager = false;
@@ -90,7 +89,7 @@ public class WebcamToRT : MonoBehaviour
             }
 
             // 2) Get texture (may be null for a few frames until initialized)
-            passthroughTex = webCamTextureManager.WebCamTexture;
+          //  passthroughTex = webCamTextureManager.WebCamTexture;
             if (passthroughTex == null)
             {
                 if (!warnedNoPTex)

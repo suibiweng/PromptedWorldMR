@@ -5,7 +5,7 @@ using UnityEngine.Networking;
 using System;
 using UnityEngine.UI;
 using UnityEngine.Android;
-using PassthroughCameraSamples;
+
 
 
 public class Fast3dFunctions : MonoBehaviour
@@ -27,7 +27,7 @@ public class Fast3dFunctions : MonoBehaviour
     public static Texture2D streamingTexture;
     public RenderTexture Mask,Depth,ObjTexture;
 
-    public WebCamTextureManager webCamTextureManager;
+    //public WebCamTextureManager webCamTextureManager;
 
     //public DisplayCaptureManager displayCaptureManager;
 
@@ -156,9 +156,9 @@ void InitCameraMask(){
         // Graphics.CopyTexture(webCamTextureManager.WebCamTexture, updatetexture2D);
         // UpdateTexture(updatetexture2D);
 
-        if(CapturePreview!=null)
+      //  if(CapturePreview!=null)
 
-        CapturePreview.texture=webCamTextureManager.WebCamTexture;
+      //  CapturePreview.texture=webCamTextureManager.WebCamTexture;
 
 
     }
@@ -218,7 +218,7 @@ void InitCameraMask(){
 
     public void CaptureIpCam(string url, string filename,Vector2 objPosition,string urlid)
     {
-        streamingTexture=Convert_WebCamTexture_To_Texture2d(webCamTextureManager.WebCamTexture);
+      //  streamingTexture=Convert_WebCamTexture_To_Texture2d(webCamTextureManager.WebCamTexture);
         if (streamingTexture == null)
         {
             Debug.LogError("No texture set for streaming. Use UpdateTexture to set a texture first.");
@@ -296,7 +296,7 @@ void InitCameraMask(){
     
     {
 
-        streamingTexture=Convert_WebCamTexture_To_Texture2d(webCamTextureManager.WebCamTexture);
+     //   streamingTexture=Convert_WebCamTexture_To_Texture2d(webCamTextureManager.WebCamTexture);
         if (streamingTexture == null)
         {
             Debug.LogError("No texture set for streaming. Use UpdateTexture to set a texture first.");
@@ -318,7 +318,7 @@ void InitCameraMask(){
 
         public void UploadErase(string url, string filename, Vector2 objPosition,string urlid)
     {
-        streamingTexture=Convert_WebCamTexture_To_Texture2d(webCamTextureManager.WebCamTexture);
+     //   streamingTexture=Convert_WebCamTexture_To_Texture2d(webCamTextureManager.WebCamTexture);
         StartCoroutine(EraseMaskUPload(streamingTexture,url, filename,objPosition,urlid));
         // Destroy(texture2D); // Clean up after upload
     }

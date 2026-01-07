@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using PassthroughCameraSamples; // if you use WebCamTextureManager from Meta samples
+//using PassthroughCameraSamples; // if you use WebCamTextureManager from Meta samples
 
 [DisallowMultipleComponent]
 public class LiveCropFollower : MonoBehaviour
@@ -14,7 +14,7 @@ public class LiveCropFollower : MonoBehaviour
     public Texture passthroughTexture;                  // Texture/RenderTexture
 
     [Tooltip("Optional provider (Meta samples). If passthroughTexture is null, we read WebCamTexture from here.")]
-    public WebCamTextureManager webCamTextureManager;
+    //public PassthroughCameraAccess webCamTextureManager;
 
     [Header("Warp Reference")]
     public Shader warpShader;       // drag QuadHomographyWarp.shader here
@@ -85,8 +85,8 @@ public class LiveCropFollower : MonoBehaviour
 
         // resolve source texture each frame (live feed)
         var src = passthroughTexture;
-        if (src == null && webCamTextureManager && webCamTextureManager.WebCamTexture)
-            src = webCamTextureManager.WebCamTexture;
+        // if (src == null && webCamTextureManager && webCamTextureManager.WebCamTexture)
+        //     src = webCamTextureManager.WebCamTexture;
         if (src == null) return;
 
         int w = src.width, h = src.height;
@@ -130,12 +130,12 @@ public class LiveCropFollower : MonoBehaviour
         int rotCCW = 0;
         bool vertMirror = false;
 
-        if (autoOrientFromWebCam && webCamTextureManager && webCamTextureManager.WebCamTexture)
-        {
-            var wct = webCamTextureManager.WebCamTexture;
-            rotCCW = ((wct.videoRotationAngle % 360) + 360) % 360; // 0/90/180/270 CCW
-            vertMirror = wct.videoVerticallyMirrored;
-        }
+        // if (autoOrientFromWebCam && webCamTextureManager && webCamTextureManager.WebCamTexture)
+        // {
+        //     var wct = webCamTextureManager.WebCamTexture;
+        //     rotCCW = ((wct.videoRotationAngle % 360) + 360) % 360; // 0/90/180/270 CCW
+        //     vertMirror = wct.videoVerticallyMirrored;
+        // }
 
         for (int i = 0; i < uv.Length; i++)
         {

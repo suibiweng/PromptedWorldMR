@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using PassthroughCameraSamples; // <-- keep this if you use the Meta sample passthrough provider
+//using PassthroughCameraSamples; // <-- keep this if you use the Meta sample passthrough provider
+using Meta.XR;
 
 public class CropPassthroughExample : MonoBehaviour
 {
@@ -12,7 +13,9 @@ public class CropPassthroughExample : MonoBehaviour
     public Texture passthroughTexture;                  // optional static texture
 
     [Header("Passthrough Provider (optional)")]
-    public WebCamTextureManager webCamTextureManager;   // <-- restored
+
+    
+    //public PassthroughCameraAccess webCamTextureManager;   // <-- restored
 
     [Header("Warp Reference (Inspector)")]
     public Shader warpShader;       // drag QuadHomographyWarp.shader here
@@ -94,8 +97,8 @@ public class CropPassthroughExample : MonoBehaviour
 
         // pick whichever texture source is valid
         Texture source = passthroughTexture;
-        if (source == null && webCamTextureManager != null)
-            source = webCamTextureManager.WebCamTexture;
+        // if (source == null && webCamTextureManager != null)
+        //     source = webCamTextureManager.WebCamTexture;
 
         if (source == null)
         {
