@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 3f4d77c93dcf6874ea9ca00ba88f1029
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 191966
+  packageName: Levers, Buttons, Switches - Pro
+  packageVersion: 2.1.1
+  assetPath: Assets/BigBlit/LeversAndButtons/Prefabs/Buttons/StaticButtons/ButtonStatic
+    A2.prefab
+  uploadId: 768426

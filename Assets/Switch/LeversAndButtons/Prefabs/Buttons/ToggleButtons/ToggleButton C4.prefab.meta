@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: effb80c63bee3ff4186cdebd6dfad438
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 191966
+  packageName: Levers, Buttons, Switches - Pro
+  packageVersion: 2.1.1
+  assetPath: Assets/BigBlit/LeversAndButtons/Prefabs/Buttons/ToggleButtons/ToggleButton
+    C4.prefab
+  uploadId: 768426

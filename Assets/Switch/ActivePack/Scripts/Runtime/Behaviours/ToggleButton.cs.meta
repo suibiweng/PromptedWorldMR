@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 3da5134ba4fbcd046aa2f50beaafe6c6
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 191966
+  packageName: Levers, Buttons, Switches - Pro
+  packageVersion: 2.1.1
+  assetPath: Assets/BigBlit/ActivePack/Scripts/Runtime/Behaviours/ToggleButton.cs
+  uploadId: 768426

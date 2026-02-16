@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 88c5f718fcedbcd49a10fc5abb6efcc3
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 191966
+  packageName: Levers, Buttons, Switches - Pro
+  packageVersion: 2.1.1
+  assetPath: Assets/BigBlit/ActivePack/Scripts/Runtime/Events/DraggableEventTrigger.cs
+  uploadId: 768426

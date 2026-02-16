@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: eab10d36144df034b9bd5e66c1e0727e
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 191966
+  packageName: Levers, Buttons, Switches - Pro
+  packageVersion: 2.1.1
+  assetPath: Assets/BigBlit/ActivePack/Scripts/Runtime/Events/ValueableEventTrigger.cs
+  uploadId: 768426

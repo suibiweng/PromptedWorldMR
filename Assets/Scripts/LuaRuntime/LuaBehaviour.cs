@@ -2,20 +2,29 @@ using System;
 using System.Collections.Generic;
 using MoonSharp.Interpreter;
 using UnityEngine;
-using LuaProxies; // proxies namespace (Vector3Proxy, GameObjectProxy, PromptedMatterProxy, etc.)
+using LuaProxies;
 
 /// <summary>
 /// Runtime Lua behaviour with lazy, safe-guarded proxy binding.
 /// - Eagerly binds gameObject & transform.
-/// - Lazily exposes self.rigidbody, self.audio, self.particles, self.animator, self.collider, etc.
-/// - Adds: self.prompted / self.promptedMatter / self.pm  (PromptedMatterProxy)
+/// - Lazily exposes self.rigidbody, self.audio, self.particles, self.animator, self.touchpad, etc.
+/// - Adds: self.prompted / self.promptedMatter / self.pm (PromptedMatterProxy)
 /// - DOTween: global 'dotween' injected per Script via LuaDOTweenBootstrap.
 /// - start(self), update(self, dt), on_trigger(self, other), on_collision(self, col), on_stop(self) supported.
 ///
-/// NOTE: For collision with child colliders:
-/// - Put Rigidbody + LuaBehaviour on the parent.
-/// - Put Colliders on children (no Rigidbody on children).
-/// - OnCollisionEnter here will still fire and pass a CollisionProxy into Lua.
+/// CUSTOM COLLISION SUPPORT:
+/// - Works with CollisionManager + SimpleCollidable which SendMessage:
+///   OnCustomCollisionEnter(GameObject other)
+///   OnCustomCollisionStay(GameObject other)
+///   OnCustomCollisionExit(GameObject other)
+/// - Forwards to Lua optional handlers if present:
+///   on_collision_enter(self, col)
+///   on_collision_stay(self, col)
+///   on_collision_exit(self, col)
+/// - Falls back to on_collision(self, col) if those do not exist.
+///
+/// NOTE:
+/// - Unity physics collisions (OnCollisionEnter) can be disabled via useUnityPhysicsCollisions.
 /// </summary>
 [DisallowMultipleComponent]
 public class LuaBehaviour : MonoBehaviour
@@ -34,6 +43,13 @@ public class LuaBehaviour : MonoBehaviour
 
     [Tooltip("If true, StopRun() will force Rigidbody.isKinematic = true and zero its velocity.")]
     public bool makeRigidbodyKinematicOnStop = true;
+
+    [Header("Collision Sources")]
+    [Tooltip("If true, Unity physics OnCollisionEnter will forward to Lua on_collision.")]
+    public bool useUnityPhysicsCollisions = false;
+
+    [Tooltip("If true, custom collision messages (from CollisionManager/SimpleCollidable) will forward to Lua.")]
+    public bool useCustomCollisions = true;
 
     [Header("Auto-Add Defaults (used by lazy proxy binding)")]
     public bool addRigidbodyIfMissing = true;
@@ -63,11 +79,20 @@ public class LuaBehaviour : MonoBehaviour
     private bool _hasRunStartPose;
     private Vector3 _runStartPosition;
 
+    [Header("External Systems")]
+    public IOTManager iotManager; // optional; auto-find in Awake if null
+
+    [Header("Optional Button")]
+    public PokeButton pokeButton; // optional; binds self.button (and self.poke alias)
+
     // Cache of bound proxies by key (e.g., "rigidbody","audio",...)
     private readonly Dictionary<string, DynValue> _proxyCache = new Dictionary<string, DynValue>();
 
     void Awake()
     {
+        if (iotManager == null)
+            iotManager = FindAnyObjectByType<IOTManager>();
+
         // Safe: registers all public userdata types in loaded assemblies (idempotent).
         UserData.RegisterAssembly();
     }
@@ -102,7 +127,7 @@ public class LuaBehaviour : MonoBehaviour
             if (rb != null)
             {
                 rb.isKinematic = true;
-                rb.linearVelocity = Vector3.zero;
+                rb.velocity = Vector3.zero;        // ✅ Unity Rigidbody uses velocity
                 rb.angularVelocity = Vector3.zero;
             }
         }
@@ -115,24 +140,8 @@ public class LuaBehaviour : MonoBehaviour
     }
 
     // === Simple wrappers for UI / SendMessage ===
-
-    /// <summary>
-    /// Called by UI "Play" button or via SendMessage("PlayLua").
-    /// </summary>
-    public void PlayLua()
-    {
-        StartRun();
-    }
-
-    /// <summary>
-    /// Called by UI "Stop" button or via SendMessage("StopLua").
-    /// </summary>
-    public void StopLua()
-    {
-        StopRun();
-    }
-
-    // ================================================
+    public void PlayLua() => StartRun();
+    public void StopLua() => StopRun();
 
     void Update()
     {
@@ -167,8 +176,12 @@ public class LuaBehaviour : MonoBehaviour
         }
     }
 
+    // ----------------------------
+    // Unity physics collisions (optional)
+    // ----------------------------
     void OnCollisionEnter(Collision col)
     {
+        if (!useUnityPhysicsCollisions) return;
         if (!runEnabled) return;
         if (_fnOnCollision == null || _fnOnCollision.Type != DataType.Function) return;
 
@@ -180,6 +193,53 @@ public class LuaBehaviour : MonoBehaviour
         catch (ScriptRuntimeException ex)
         {
             Debug.LogError($"[Lua] on_collision() error on '{name}': {ex.DecoratedMessage}");
+        }
+    }
+
+    // ----------------------------
+    // Custom bounds collisions (from CollisionManager/SimpleCollidable)
+    // CollisionManager calls SendMessage("OnCustomCollisionEnter", otherGO) etc.
+    // ----------------------------
+    void OnCustomCollisionEnter(GameObject other)
+    {
+        if (!useCustomCollisions) return;
+        ForwardCustomCollision("on_collision_enter", other);
+    }
+
+    void OnCustomCollisionStay(GameObject other)
+    {
+        if (!useCustomCollisions) return;
+        ForwardCustomCollision("on_collision_stay", other);
+    }
+
+    void OnCustomCollisionExit(GameObject other)
+    {
+        if (!useCustomCollisions) return;
+        ForwardCustomCollision("on_collision_exit", other);
+    }
+
+    private void ForwardCustomCollision(string preferredFnName, GameObject other)
+    {
+        if (!runEnabled) return;
+        if (_script == null || _self == null) return;
+
+        try
+        {
+            // Prefer specific phase handler if present; else fall back to on_collision
+            DynValue fn = _script.Globals.Get(preferredFnName);
+            if (fn == null || fn.Type != DataType.Function)
+                fn = _fnOnCollision;
+
+            if (fn == null || fn.Type != DataType.Function)
+                return;
+
+            // Requires CustomCollisionProxy to be defined in LuaProxies
+            var proxy = new CustomCollisionProxy(gameObject, other);
+            _script.Call(fn, _self, UserData.Create(proxy));
+        }
+        catch (ScriptRuntimeException ex)
+        {
+            Debug.LogError($"[Lua] {preferredFnName} error on '{name}': {ex.DecoratedMessage}");
         }
     }
 
@@ -213,33 +273,43 @@ public class LuaBehaviour : MonoBehaviour
 
     private void CompileBind(string src)
     {
+        _proxyCache.Clear(); // ✅ important when reloading scripts
+
         // New VM with your proxy-based environment
         _script = new Script(CoreModules.Preset_Default);
 
-// Register proxy types (explicit; safe to call multiple times)
-UserData.RegisterType<Vector3Proxy>();
-UserData.RegisterType<GameObjectProxy>();
-UserData.RegisterType<TransformProxy>();
-UserData.RegisterType<RigidbodyProxy>();
-UserData.RegisterType<ParticleSystemProxy>();
-UserData.RegisterType<AudioSourceProxy>();
-UserData.RegisterType<AnimatorProxy>();
-UserData.RegisterType<TextProxy>();
-UserData.RegisterType<ButtonProxy>();
-UserData.RegisterType<CollisionProxy>();
-UserData.RegisterType<LuaDOTween>();
-UserData.RegisterType<PromptedMatterProxy>();
-UserData.RegisterType<TouchpadInputProxy>(); // NEW
-if (exposeProgramableProxy) UserData.RegisterType<ProgramableObjectProxy>();
+        // Register proxy types (explicit; safe to call multiple times)
+        UserData.RegisterType<Vector3Proxy>();
+        UserData.RegisterType<GameObjectProxy>();
+        UserData.RegisterType<TransformProxy>();
+        UserData.RegisterType<RigidbodyProxy>();
+        UserData.RegisterType<ParticleSystemProxy>();
+        UserData.RegisterType<AudioSourceProxy>();
+        UserData.RegisterType<AnimatorProxy>();
+        UserData.RegisterType<TextProxy>();
+        UserData.RegisterType<ButtonProxy>();
+        UserData.RegisterType<CollisionProxy>();
+        UserData.RegisterType<LuaDOTween>();
+        UserData.RegisterType<PromptedMatterProxy>();
+        UserData.RegisterType<TouchpadInputProxy>();
+        UserData.RegisterType<IoTProxy>();
+        UserData.RegisterType<PokeButtonProxy>();
 
+        // ✅ Custom collision proxy (bounds-based)
+        UserData.RegisterType<CustomCollisionProxy>();
+
+        if (exposeProgramableProxy) UserData.RegisterType<ProgramableObjectProxy>();
 
         // (If any script wants to use raw Vector3 tables, this won’t hurt.)
         UserData.RegisterType<Vector3>();
 
         // Globals: logs
-        _script.Globals["log"]   = (Action<string>)((s) => Debug.Log($"[Lua] {s}"));
-        _script.Globals["warn"]  = (Action<string>)((s) => Debug.LogWarning($"[Lua] {s}"));
+        _script.Globals["log"] = (Action<string>)((s) => Debug.Log($"[Lua] {s}"));
+        _script.Globals["warn"] = (Action<string>)((s) => Debug.LogWarning($"[Lua] {s}"));
         _script.Globals["error"] = (Action<string>)((s) => Debug.LogError($"[Lua] {s}"));
+
+        // Global IoT (matches your prompt docs: global iot)
+        _script.Globals["iot"] = new IoTProxy(iotManager);
 
         // DOTween: inject a fresh helper per-script
         LuaDOTweenBootstrap.InjectInto(_script); // provides global 'dotween'
@@ -306,21 +376,29 @@ if (exposeProgramableProxy) UserData.RegisterType<ProgramableObjectProxy>();
                     break;
                 }
 
-                    // ---- NEW: touchpad input proxy ----
-                 case "touchpad":
-            {
-        var ts = GetComponent<TouchpadInputState>();
-        if (ts != null) bound = UserData.Create(new TouchpadInputProxy(ts));
-        break;
-            }
+                // ---- Touchpad input proxy ----
+                case "touchpad":
+                {
+                    var ts = GetComponent<TouchpadInputState>();
+                    if (ts != null) bound = UserData.Create(new TouchpadInputProxy(ts));
+                    break;
+                }
 
+                // ---- Button proxy (match your prompt docs: self.button) ----
+                // Also allow alias self.poke for convenience.
+                case "button":
+                case "poke":
+                {
+                    if (pokeButton != null) bound = UserData.Create(new PokeButtonProxy(pokeButton));
+                    break;
+                }
 
                 case "collider":
                 {
                     // Only add if explicitly enabled; default off because shape matters.
                     var col = GetComponent<Collider>();
                     if (col == null && addBoxColliderIfMissing) col = gameObject.AddComponent<BoxCollider>();
-                    if (col != null) bound = UserData.Create(new GameObjectProxy(col.gameObject)); // or ColliderProxy if you add one
+                    if (col != null) bound = UserData.Create(new GameObjectProxy(col.gameObject)); // (no ColliderProxy currently)
                     break;
                 }
 
@@ -331,14 +409,14 @@ if (exposeProgramableProxy) UserData.RegisterType<ProgramableObjectProxy>();
                     if (txt != null) bound = UserData.Create(new TextProxy(txt));
                     break;
                 }
-                case "button":
+                case "uiButton":
                 {
                     var btn = GetComponentInChildren<UnityEngine.UI.Button>();
                     if (btn != null) bound = UserData.Create(new ButtonProxy(btn));
                     break;
                 }
 
-                // ---- NEW: PromptedMatter proxy (preferred) ----
+                // ---- PromptedMatter proxy (preferred) ----
                 case "prompted":
                 case "promptedMatter":
                 case "pm":
@@ -371,16 +449,24 @@ if (exposeProgramableProxy) UserData.RegisterType<ProgramableObjectProxy>();
 
         // Eager-bind must-haves:
         _self["gameObject"] = UserData.Create(new GameObjectProxy(gameObject));
-        _self["transform"]  = UserData.Create(new TransformProxy(transform));
+        _self["transform"] = UserData.Create(new TransformProxy(transform));
+
+        // (Optional) also eager-bind button if present so LLM scripts can use self.button immediately
+        if (pokeButton != null)
+        {
+            var b = UserData.Create(new PokeButtonProxy(pokeButton));
+            _self["button"] = b;
+            _self["poke"] = b;
+        }
 
         // Load source
         _script.DoString(src);
 
         // Cache function handles if present
-        _fnStart          = _script.Globals.Get("start");
-        _fnUpdate         = _script.Globals.Get("update");
-        _fnOnTrigger      = _script.Globals.Get("on_trigger");
-        _fnOnCollision    = _script.Globals.Get("on_collision");
+        _fnStart = _script.Globals.Get("start");
+        _fnUpdate = _script.Globals.Get("update");
+        _fnOnTrigger = _script.Globals.Get("on_trigger");
+        _fnOnCollision = _script.Globals.Get("on_collision");
         _fnOnStopOptional = _script.Globals.Get("on_stop");
 
         // Keep preview synced
@@ -419,8 +505,8 @@ if (exposeProgramableProxy) UserData.RegisterType<ProgramableObjectProxy>();
         {
             rb = gameObject.AddComponent<Rigidbody>();
             rb.isKinematic = rbKinematicDefault;
-            rb.useGravity  = rbUseGravityDefault;
-            rb.mass        = rbMassDefault;
+            rb.useGravity = rbUseGravityDefault;
+            rb.mass = rbMassDefault;
         }
         return rb;
     }

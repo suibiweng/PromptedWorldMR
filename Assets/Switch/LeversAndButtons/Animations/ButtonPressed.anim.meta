@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fe8663dd748e5cd498f791463e41ffe2
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 191966
+  packageName: Levers, Buttons, Switches - Pro
+  packageVersion: 2.1.1
+  assetPath: Assets/BigBlit/LeversAndButtons/Animations/ButtonPressed.anim
+  uploadId: 768426

@@ -6,6 +6,15 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/IOTMR.unity
+    guid: 91a0857a8376041d9ad9bd7c8c46ba03
+  - enabled: 1
+    path: Assets/Scenes/IOT VR setup.unity
+    guid: 1fdddc46ce83149709965e34d48c4ebc
+  - enabled: 1
+    path: Assets/Scenes/ScenePlannerMR.unity
+    guid: 6eb855d9a9ecf47ef8ce3dcb3eed3d47
+  - enabled: 1
     path: Assets/Scenes/Detection.unity
     guid: 14fa934bd32ab40c6b9ad6cc8549e1b8
   - enabled: 1

@@ -223,6 +223,8 @@ public class OpenAILuaGenerator : MonoBehaviour
         if (plan == null)
             return null;
 
+        activeScenePlan = plan;
+
         // 🔑 LOAD SAME PROMPTS AS SINGLE MODE
         string basePrompt = LoadText(basePromptResourcePath);
         string template = LoadText(userPromptTemplateResourcePath);
@@ -241,16 +243,15 @@ public class OpenAILuaGenerator : MonoBehaviour
 
         string userPrompt = BuildBatchUserPrompt(plan, template);
 
+        Debug.Log("[OpenAILuaGenerator] Batch user prompt:\n" + userPrompt);
+
         var req = new ChatRequest
         {
             model = model,
             temperature = temperature,
             messages = new List<Message>
             {
-                // 🔑 SAME SYSTEM PROMPT AS SINGLE MODE
                 new Message { role = "system", content = basePrompt },
-
-                // 🔑 Batch user prompt embedding the SAME TEMPLATE
                 new Message { role = "user", content = userPrompt }
             }
         };
@@ -283,13 +284,19 @@ public class OpenAILuaGenerator : MonoBehaviour
             resp.choices[0].message.content
         );
 
+        Debug.Log("[OpenAILuaGenerator] RAW BATCH JSON:\n" + raw);
+
         return JsonUtility.FromJson<LuaAssignmentPlan>(raw);
     }
+
+    // ============================================================
+    // ===================== NEW SMART BATCH PROMPT =====================
+    // ============================================================
 
     private string BuildBatchUserPrompt(ScenePlan plan, string template)
     {
         var sb = new StringBuilder();
-
+        
         sb.AppendLine("You must generate Lua scripts using the EXACT template below.");
         sb.AppendLine("Each script MUST fully satisfy the required lifecycle contract.");
         sb.AppendLine();
@@ -300,18 +307,62 @@ public class OpenAILuaGenerator : MonoBehaviour
         sb.AppendLine();
 
         sb.AppendLine("======================================");
+        sb.AppendLine("SCENE CONTEXT");
+        sb.AppendLine("======================================");
+        sb.AppendLine($"Scene type: {plan.scene_type}");
+        sb.AppendLine($"Summary: {plan.summary}");
+        sb.AppendLine(BuildIoTContext());
+
+        sb.AppendLine();
+
+        sb.AppendLine("Objects in scene:");
+        foreach (var o in plan.objects)
+        {
+            sb.AppendLine(
+                $"- id: {o.id}, role: {o.role}, count: {o.count}, interactive: {o.interactive}"
+            );
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("======================================");
         sb.AppendLine("OBJECTS TO GENERATE");
         sb.AppendLine("======================================");
+
+        // Build lookup from planned_behaviors
+        Dictionary<string, string> plannedIntentByPrefix = new();
+        if (plan.planned_behaviors != null)
+        {
+            foreach (var pb in plan.planned_behaviors)
+            {
+                if (string.IsNullOrWhiteSpace(pb.target) || string.IsNullOrWhiteSpace(pb.intent))
+                    continue;
+
+                plannedIntentByPrefix[pb.target] = pb.intent;
+            }
+        }
 
         foreach (var obj in plan.objects)
         {
             if (!obj.interactive)
                 continue;
 
+            string intent = "Design appropriate Mixed Reality behavior for this object.";
+
+            // Try to find a matching planned behavior by prefix
+            foreach (var kv in plannedIntentByPrefix)
+            {
+                if (obj.id.StartsWith(kv.Key))
+                {
+                    intent = kv.Value;
+                    break;
+                }
+            }
+
             sb.AppendLine();
             sb.AppendLine("OBJECT:");
             sb.AppendLine($"OBJECT_NAME: {obj.id}");
-            sb.AppendLine($"INTENT: Design appropriate Mixed Reality behavior for this object.");
+            sb.AppendLine($"INTENT: {intent}");
+            sb.AppendLine($"ROLE: {obj.role}");
             sb.AppendLine($"SCENE_TYPE: {plan.scene_type}");
             sb.AppendLine();
         }
@@ -368,12 +419,50 @@ Rules:
             sceneContext = sb.ToString();
         }
 
-        return template
-            .Replace("{OBJECT_NAME}", objectName)
-            .Replace("{INTENT}", intent)
-            .Replace("{CURRENT_LUA}", currentLua)
-            .Replace("{SCENE_CONTEXT}", sceneContext);
+string iotContext = BuildIoTContext();
+
+    return template
+    .Replace("{OBJECT_NAME}", objectName)
+    .Replace("{INTENT}", intent)
+    .Replace("{CURRENT_LUA}", currentLua)
+    .Replace("{SCENE_CONTEXT}", sceneContext + iotContext);
+
     }
+
+
+
+
+    private string BuildIoTContext()
+{
+    var manager = FindObjectOfType<IOTManager>();
+    if (manager == null)
+        return "";
+
+    var ids = manager.GetAllDeviceIDs();
+    if (ids == null || ids.Count == 0)
+        return "";
+
+    var sb = new StringBuilder();
+
+    sb.AppendLine();
+    sb.AppendLine("AVAILABLE IOT DEVICES:");
+
+    foreach (var id in ids)
+        sb.AppendLine("- " + id);
+
+    sb.AppendLine();
+    sb.AppendLine("IoT Usage Rules:");
+    sb.AppendLine("- Use iot:On(id) or iot:Off(id)");
+    sb.AppendLine("- Only use IDs from this list");
+    sb.AppendLine("- Do NOT invent device IDs");
+    sb.AppendLine("- Only use IoT if relevant to user intent");
+    sb.AppendLine();
+
+    return sb.ToString();
+}
+
+
+
 
     private static string LoadText(string path)
     {

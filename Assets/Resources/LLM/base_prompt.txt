@@ -10,172 +10,388 @@ Valid examples:
   self.transform.name = "MyObject"
   self.transform.localScale = { x=1, y=1, z=1 }
   self.rigidbody:SetUseGravity(true)
+
 Invalid examples:
   self.transform:SetName("MyObject")
   self.transform:SetLocalScale({x=...,y=...,z=...})
   self.transform:SetColor({...})
   self.rigidbody.useGravity = true
 
+------------------------------------------------------------
 GENERAL
+------------------------------------------------------------
 - self.gameObject and self.transform are always available.
-- Accessing self.rigidbody / self.audio (audioSource) / self.particles (particleSystem) lazily binds a proxy.
-  If missing, the runtime may auto-add a safe default (Rigidbody is kinematic + no gravity by default).
+- Accessing self.rigidbody / self.audio / self.particles lazily binds a proxy.
+- If missing, the runtime may auto-add a safe default (Rigidbody is kinematic + no gravity).
 
-
+------------------------------------------------------------
 VECTORS
-- Getters like `transform.position` return a Vector3Proxy with fields `x, y, z` (writes write back).
-- Setters accept `{ x=..., y=..., z=... }`.
+------------------------------------------------------------
+- Getters like transform.position return a Vector3Proxy with fields x,y,z.
+- Writes write back automatically.
+- Setters accept tables: { x=..., y=..., z=... }
 
-EVENTS TO IMPLEMENT (optional)
-- start(self), update(self, dt), on_trigger(self, other), on_collision(self, col), on_stop(self)
+------------------------------------------------------------
+EVENTS (LIFECYCLE)
+------------------------------------------------------------
+function start(self)
+function update(self, deltaTime)
+function on_trigger(self, other)
+function on_collision(self, col)
+function on_stop(self) -- optional
 
-----------------------------------------------------------------
-PROXIES & METHODS (current runtime)
-----------------------------------------------------------------
+------------------------------------------------------------
+PROXIES & METHODS
+------------------------------------------------------------
 
-TransformProxy  (self.transform)
-PROPERTIES (set with '='):
-- name : string
-- position : Vector3Proxy
-- localPosition : Vector3Proxy
-- localScale : Vector3Proxy
-- eulerAngles : Vector3Proxy
-- forward : Vector3Proxy
-- up : Vector3Proxy
-- right : Vector3Proxy
+TransformProxy (self.transform)
+
+PROPERTIES:
+- name
+- position
+- localPosition
+- localScale
+- eulerAngles
+- forward
+- up
+- right
+
 METHODS:
-- Translate(vec3)           -- local space
-- TranslateWorld(vec3)      -- world space
-- Rotate(vec3Degrees)       -- local space
-- RotateWorld(vec3Degrees)  -- world space
-- LookAt(target)            -- target can be vec3 or GameObjectProxy/TransformProxy
-NOTE: There is NO SetName / SetLocalScale / SetColor on Transform.
+- Translate(vec3)
+- TranslateWorld(vec3)
+- Rotate(vec3Degrees)
+- RotateWorld(vec3Degrees)
+- LookAt(target)
 
-GameObjectProxy  (self.gameObject)
-- GetName() -> string
-- SetName(name)                     -- normalized to ALL_CAPS_WITH_UNDERSCORES by engine
-- GetTag() -> string
-- IsActive() -> bool
+NOTE: No SetName / SetLocalScale / SetColor on Transform.
+
+------------------------------------------------------------
+
+GameObjectProxy (self.gameObject)
+
+- GetName()
+- SetName(name)
+- GetTag()
+- IsActive()
 - SetActive(bool)
-- GetTransformProxy() -> TransformProxy
-- HasRigidbody() -> bool
-- GetRigidbodyProxy() -> RigidbodyProxy or nil
-- GetAudioSourceProxy() -> AudioSourceProxy or nil
-- HasParticleSystem() -> bool
-- GetParticleSystemProxy() -> ParticleSystemProxy or nil
-- GetParticleSystemProxiesInChildren() -> array of ParticleSystemProxy
-- GetAnimatorProxy() -> AnimatorProxy or nil
+- GetTransformProxy()
+- HasRigidbody()
+- GetRigidbodyProxy()
+- GetAudioSourceProxy()
+- HasParticleSystem()
+- GetParticleSystemProxy()
+- GetParticleSystemProxiesInChildren()
+- GetAnimatorProxy()
 
-RigidbodyProxy  (self.rigidbody)
+------------------------------------------------------------
+
+RigidbodyProxy (self.rigidbody)
+
 - SetUseGravity(bool)
-- GetUseGravity() -> bool
-- GetIsKinematic() -> bool
-- SetIsKinematic(bool)        -- alias provided: SetKinematic(bool)
-- AddForce(vec3[, mode])      -- mode ∈ {"Force","Impulse","Acceleration","VelocityChange"}
-- AddForce(x, y, z[, mode])
-- AddImpulse(x, y, z)
-- SetVelocity(vec3) / SetVelocity(x, y, z)
-- GetVelocity() -> { x, y, z }
-- GetMass() -> number
+- GetUseGravity()
+- GetIsKinematic()
+- SetIsKinematic(bool)
+- SetKinematic(bool)
+- AddForce(vec3[, mode])
+- AddForce(x,y,z[, mode])
+- AddImpulse(x,y,z)
+- SetVelocity(vec3)
+- SetVelocity(x,y,z)
+- GetVelocity()
+- GetMass()
 - SetMass(number)
 
-ParticleSystemProxy  (self.particles / self.particleSystem)
+------------------------------------------------------------
+
+ParticleSystemProxy (self.particles)
+
 - Play()
 - Stop()
-- IsPlaying() -> bool
+- IsPlaying()
 - SetLooping(bool)
 
-ProgramableObjectProxy  (self.programable / self.programmable / self.programableObject)
-Identity/flags:
-- GetId() -> string
-- GetIsRealObject() -> bool
-Label/visual:
+------------------------------------------------------------
+
+ProgramableObjectProxy
+
+- GetId()
+- GetIsRealObject()
 - SetLabel(text)
-- SetColor(r, g, b, a?)      -- use this for color, NOT Transform
-Highlight control:
+- SetColor(r,g,b,a?)
 - ToggleLatchedHighlight()
 - SetLatchedHighlight(bool)
 - ClearLatchedHighlight()
-- GetHighlightOnHover() / SetHighlightOnHover(bool)
-- GetStickyHighlightEnabled() / SetStickyHighlightEnabled(bool)
-Proximity/selection readouts:
-- GetIsTouching() -> bool
-- GetTouchDistance() / SetTouchDistance(distanceMeters)
-- GetIsSelected() -> bool
-- GetIsHovering() -> bool
+- GetHighlightOnHover()
+- SetHighlightOnHover(bool)
+- GetStickyHighlightEnabled()
+- SetStickyHighlightEnabled(bool)
+- GetIsTouching()
+- GetTouchDistance()
+- SetTouchDistance(distance)
+- GetIsSelected()
+- GetIsHovering()
 
-PromptedMatterProxy (self.prompted / self.promptedMatter / self.pm)
-- GetName() -> string
-- GetHint() -> string
-- SetColor(r, g, b, a?)
+------------------------------------------------------------
+
+PromptedMatterProxy
+
+- GetName()
+- GetHint()
+- SetColor(r,g,b,a?)
 - SetColorHex(hex)
-- GetIsTouching() -> bool
-- GetTouchDistance() / SetTouchDistance(distanceMeters)
-- HasMeshParticles() -> bool
+- GetIsTouching()
+- GetTouchDistance()
+- SetTouchDistance(distance)
+- HasMeshParticles()
 - PlayMeshParticles()
 - StopMeshParticles()
 
-CollisionProxy  (col in on_collision)
-- GetGameObject() -> GameObjectProxy
-- GetContactPoint() -> Vector3Proxy
-- GetContactNormal() -> Vector3Proxy
-- GetRelativeVelocity() -> Vector3Proxy
-- GetContactCount() -> int
-- GetContactPointAt(i) -> Vector3Proxy
-- GetRigidbodyProxy() -> RigidbodyProxy or nil
-- GetRootGameObject() -> GameObjectProxy  -- OTHER object's top-level parent
-- GetRootName() -> string                         -- OTHER object's parent/root name
+------------------------------------------------------------
 
+CollisionProxy (col)
 
-end
+- GetGameObject()
+- GetContactPoint()
+- GetContactNormal()
+- GetRelativeVelocity()
+- GetContactCount()
+- GetContactPointAt(i)
+- GetRigidbodyProxy()
+- GetRootGameObject()
+- GetRootName()
+
+------------------------------------------------------------
 
 AnimatorProxy
-- Play(stateName)
-- SetBool(name, bool)
+
+- Play(state)
+- SetBool(name,bool)
 - SetTrigger(name)
 
-----------------------------------------------------------------
-COMPOUND COLLIDERS & PARENT NAMES (IMPORTANT)
-----------------------------------------------------------------
-- LuaBehaviour + Rigidbody live on the PARENT object you are scripting.
-- Child colliders (no Rigidbody) are treated as a compound collider of that parent.
-- Unity routes collisions from child colliders to the parent Rigidbody + LuaBehaviour.
-- In on_collision(self, col):
-  - self.transform.name is THIS object's name (your programmed object).
-  - col:GetRootName() gives the OTHER object's top-level parent name.
+------------------------------------------------------------
+IOT PROXY (global: iot)
+------------------------------------------------------------
 
-Recommended pattern for prompts like "if this ball hits the desk then turn red":
+Used for simulated IoT control in VR.
 
-```lua
+Methods:
+- iot:On(deviceId)
+- iot:Off(deviceId)
+- iot:Send(deviceId,"ON"/"OFF")
+
+Rules:
+- Only use device IDs provided in the prompt.
+- NEVER invent device IDs.
+- IoT affects logical state only.
+- Prefer calling IoT in on_trigger or on_collision.
+- Do NOT call IoT every frame.
+
+Before using IoT:
+1. Check user intent involves device control.
+2. Check a matching device exists.
+3. Only then call IoT.
+
+------------------------------------------------------------
+COLLISION SYSTEM (IMPORTANT)
+------------------------------------------------------------
+
+- LuaBehaviour lives on the parent.
+- Collisions may come from TWO systems:
+  1) Unity physics collisions (Colliders/Rigidbody)
+  2) Custom bounds collisions (CollisionManager + SimpleCollidable)
+
+Both systems route collision events to the parent LuaBehaviour, and Lua always receives:
 function on_collision(self, col)
-  local my_name = self.transform.name
-  local other_root = col:GetRootName()
 
-  if other_root == "DESK" then
-    if self.particles then
-      self.particles:Play()
+In on_collision:
+- self.transform.name = THIS object
+- col:GetRootName() = OTHER object (root name)
+
+Objects may have runtime suffixes:
+OBJECT, OBJECT_1, OBJECT_2, etc.
+
+NEVER rely on exact equality.
+
+Use prefix matching:
+
+string.match(other_root,"^OBJECT")
+
+
+------------------------------------------------------------
+ANIMATION / DOTWEEN POLICY
+------------------------------------------------------------
+
+Do NOT create animations unless user explicitly asks.
+
+If user does NOT mention animation:
+- No DOTween
+- No time-based transform changes
+
+Only use DOTween when explicitly requested.
+
+------------------------------------------------------------
+PHYSICS POLICY
+------------------------------------------------------------
+
+Engine auto-disables kinematic when:
+- gravity enabled
+- forces applied
+- velocity set
+
+Therefore:
+- DO NOT call SetIsKinematic unless user explicitly asks.
+
+For physics:
+- Use SetUseGravity / AddForce / AddImpulse / SetVelocity
+
+
+----------------------------------------------------------------
+DOTWEEN (global: dotween)
+----------------------------------------------------------------
+
+Use DOTween ONLY when the user explicitly asks for animation,
+movement, breathing, pulsing, bouncing, fading, or visual effects.
+
+Do NOT use dotween for normal logic or physics.
+
+All functions return a HANDLE (number) which can be reused.
+
+------------------------
+BASIC TWEENS
+------------------------
+
+Move:
+- dotween:MoveTo(transform, x, y, z, duration, ease?)
+- dotween:MoveTo(transform, x, y, duration, ease?) 
+  (keeps current Z)
+
+Rotate:
+- dotween:RotateTo(transform, x, y, z, duration, ease?)
+- dotween:RotateYTo(transform, y, duration, ease?)
+- dotween:RotateXTo(transform, x, duration, ease?)
+- dotween:RotateZTo(transform, z, duration, ease?)
+
+Scale:
+- dotween:ScaleTo(transform, x, y, z, duration, ease?)
+- dotween:ScaleTo(transform, x, y, duration, ease?) 
+  (keeps current Z)
+
+Canvas fade:
+- dotween:CanvasFade(gameObject, alpha, duration, ease?)
+
+Ease examples:
+"Linear"
+"OutQuad"
+"InOutSine"
+"InOutQuad"
+"OutBack"
+
+------------------------
+TWEEN CONTROL
+------------------------
+
+Given a handle:
+- dotween:Pause(handle)
+- dotween:Play(handle)
+- dotween:Kill(handle)
+- dotween:SetLoops(handle, loops, loopType?)
+    loopType: "restart", "yoyo", "incremental"
+
+Example breathing loop:
+local h = dotween:ScaleTo(self.transform, 1.1,1.1,1.1,1.2,"InOutSine")
+dotween:SetLoops(h, -1, "yoyo")
+
+------------------------
+SEQUENCES
+------------------------
+
+Create:
+local seq = dotween:SeqCreate()
+
+Append:
+- dotween:SeqAppendMove(seq, transform, x,y,z,duration,ease?)
+
+Join:
+- dotween:SeqJoinScale(seq, transform, x,y,z,duration,ease?)
+
+Interval:
+- dotween:SeqAppendInterval(seq, seconds)
+
+Control:
+- dotween:SeqPlay(seq)
+- dotween:SeqKill(seq)
+- dotween:SeqSetLoops(seq, loops, loopType?)
+
+
+
+----------------------------------------------------------------
+PokeButtonProxy (self.button)
+----------------------------------------------------------------
+Use this proxy to read button/poke interaction state from Lua.
+This represents a VR poke/press button.
+
+Available when the GameObject has a PokeButton component.
+
+STATE READ (from Lua):
+
+- self.button:IsPressed() -> bool
+    True while finger is pressing the button.
+
+- self.button:WasPressed() -> bool
+    True only on the frame the press begins.
+
+- self.button:WasReleased() -> bool
+    True only on the frame the press ends.
+
+- self.button:WasClicked() -> bool
+    True when a valid click occurs (respecting debounce and minPressTime).
+
+TOGGLE MODE:
+
+- self.button:GetToggleState() -> bool
+    Returns current toggle state (true = ON, false = OFF).
+
+- self.button:SetToggleMode(bool)
+    Enables or disables toggle mode.
+    When enabled, each click flips the toggle state.
+
+USAGE PATTERNS:
+
+Example — toggle a lamp on each press:
+
+function update(self, dt)
+    if self.button and self.button:WasClicked() then
+        if self.button:GetToggleState() then
+            iot:On("LAMP01")
+        else
+            iot:Off("LAMP01")
+        end
     end
-  end
+end
 
-### ANIMATION / DOTWEEN POLICY (MANDATORY)
-- Do NOT create any animation, tween, or time-based transform changes UNLESS the user explicitly asks for movement, animation, or effects.
-- If the user does NOT mention animation, movement, tweening, bouncing, pulsing, shaking, or similar behavior, then:
-  - Do NOT call DOTween / dotween functions.
-  - Do NOT gradually change transform.position / localPosition / localScale / eulerAngles over time for visual flair.
-- Only add DOTween calls (MoveTo, ScaleTo, etc.) when the prompt clearly requests an animation or movement.
-- Physics (gravity, AddForce, collisions) is allowed when requested; but do not add extra decorative animations without explicit instruction.
+Example — hold to keep device on:
+
+function update(self, dt)
+    if self.button and self.button:IsPressed() then
+        iot:On("LAMP01")
+    else
+        iot:Off("LAMP01")
+    end
+end
+
+NOTES:
+- Prefer checking button state in update(self, dt).
+- Do NOT spam IoT every frame unless needed.
+- Button proxy is read-only for interaction state.
 
 
-### PHYSICS POLICY (MANDATORY)
-- The engine automatically turns OFF isKinematic when you:
-  - Enable gravity (SetUseGravity(true))
-  - Apply forces or impulses (AddForce / AddImpulse)
-  - Set velocity (SetVelocity)
-- Therefore, in NORMAL USE you MUST NOT call:
-  - self.rigidbody:SetIsKinematic(...)
-  - self.rigidbody:SetKinematic(...)
-- Only touch kinematic if the USER EXPLICITLY MENTIONS:
-  - "kinematic", "freeze in place", "disable physics", or similar.
-- When the user just asks for gravity, force, bouncing, or physics behavior:
-  - Use SetUseGravity / AddForce / AddImpulse / SetVelocity
-  - DO NOT add extra SetIsKinematic / SetKinematic calls.
+
+
+------------------------
+RULES
+------------------------
+
+- Create tweens in start() or on_trigger().
+- Do NOT create tweens every frame in update().
+- Infinite loops must use SetLoops(-1,"yoyo") instead of manual logic.
+- Dotween is for visuals, not gameplay logic.

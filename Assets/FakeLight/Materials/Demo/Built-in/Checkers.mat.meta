@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 47e6e2ee495073d4a8cb8c144ee45261
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308829
+  packageName: FakeLight | Light Beam & Point Light
+  packageVersion: 2.0
+  assetPath: Assets/FakeLight/Materials/Demo/Built-in/Checkers.mat
+  uploadId: 841116

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 24c96875f068f504fbbc0f63e8316dae
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308829
+  packageName: FakeLight | Light Beam & Point Light
+  packageVersion: 2.0
+  assetPath: Assets/FakeLight/Prefab/FakeSpotLight.prefab
+  uploadId: 841116

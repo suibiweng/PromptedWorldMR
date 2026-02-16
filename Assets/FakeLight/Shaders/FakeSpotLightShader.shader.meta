@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 2ecffd19442885246ad3aced4819bcdc
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308829
+  packageName: FakeLight | Light Beam & Point Light
+  packageVersion: 2.0
+  assetPath: Assets/FakeLight/Shaders/FakeSpotLightShader.shader
+  uploadId: 841116

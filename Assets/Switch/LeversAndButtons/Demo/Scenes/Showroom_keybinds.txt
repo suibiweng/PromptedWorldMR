@@ -1,0 +1,5 @@
+WSAD - Control position
+Tag - Turn camera movement and orientation on/off
+Space - Toggle cursor.
+Mouse - Control camera orientation.
+SHIFT - Run

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 07ba7b6eb6d15e945b5647f44c8dc90c
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308829
+  packageName: FakeLight | Light Beam & Point Light
+  packageVersion: 2.0
+  assetPath: Assets/FakeLight/Demo/URP/FakeLight URP.unity
+  uploadId: 841116

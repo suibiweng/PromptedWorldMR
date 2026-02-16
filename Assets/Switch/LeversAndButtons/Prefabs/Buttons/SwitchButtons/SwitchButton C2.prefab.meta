@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 71f12963df71b914697f6919b571e13a
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 191966
+  packageName: Levers, Buttons, Switches - Pro
+  packageVersion: 2.1.1
+  assetPath: Assets/BigBlit/LeversAndButtons/Prefabs/Buttons/SwitchButtons/SwitchButton
+    C2.prefab
+  uploadId: 768426

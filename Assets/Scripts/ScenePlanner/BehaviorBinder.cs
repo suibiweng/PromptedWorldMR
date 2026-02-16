@@ -14,12 +14,17 @@ public class BehaviorBinder : MonoBehaviour
         if (luaGenerator == null || plan == null)
             return;
 
+        // Let generator know the plan (for context)
+        luaGenerator.activeScenePlan = plan;
+
         var batch = luaGenerator.GenerateBatchForScenePlan(plan);
         if (batch == null || batch.lua_assignments == null)
         {
             Debug.LogWarning("[BehaviorBinder] No batch Lua returned");
             return;
         }
+
+        Debug.Log("[BehaviorBinder] Batch Lua count: " + batch.lua_assignments.Count);
 
         foreach (var assignment in batch.lua_assignments)
         {

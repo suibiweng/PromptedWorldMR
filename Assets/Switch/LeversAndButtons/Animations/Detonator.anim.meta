@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 24e159febfc427b46b29b9eeeddb6f2b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 191966
+  packageName: Levers, Buttons, Switches - Pro
+  packageVersion: 2.1.1
+  assetPath: Assets/BigBlit/LeversAndButtons/Animations/Detonator.anim
+  uploadId: 768426

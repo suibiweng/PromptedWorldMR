@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 2dd09b677954f4447977db3dd91de4bb
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308829
+  packageName: FakeLight | Light Beam & Point Light
+  packageVersion: 2.0
+  assetPath: Assets/FakeLight/Demo/HDRP/FakeLight HDRP.unity
+  uploadId: 841116

@@ -1,0 +1,9 @@
+fileFormatVersion: 2
+guid: 1503b5d1d2e48a2448215adc76fcc030
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308829
+  packageName: FakeLight | Light Beam & Point Light
+  packageVersion: 2.0
+  assetPath: Assets/FakeLight/Scripts/EnableDepth.cs
+  uploadId: 841116

@@ -3,6 +3,7 @@ using System.Linq;
 using Meta.XR.EnvironmentDepth;
 using UnityEngine;
 using System.Globalization;
+using TMPro;
 
 namespace Meta.XR.BuildingBlocks.AIBlocks
 {
@@ -12,38 +13,67 @@ namespace Meta.XR.BuildingBlocks.AIBlocks
         [Header("Prefab")]
         public GameObject boundingBoxPrefab;
 
-        [Header("Tracking")]
-        public float lostTimeout = 1.5f;
-        public float mergeDistance = 0.4f;
+        [Header("Tracking Mode")]
+        public bool persistentTracking = true;
+[Header("Tracking Distances (IDENTITY)")]
+public float mergeDistance = 0.25f;
+public float duplicateRejectDistance = 0.15f;
+public float maxNewObjectDistance = 0.4f;
+
+[Header("Depth Validation")]
+public float minDepthDistance = 0.05f;
+public float maxDepthDistance = 4.0f;
+public bool enableRaycastValidation = false;   // 🔥 TURN THIS OFF FIRST
+public float surfaceSnapTolerance = 0.5f;
+
+[Header("Size Validation")]
+public float minObjectSize = 0.005f;
+public float maxObjectSize = 5.0f;
+
+
+        [Header("Semantic Filtering")]
+        public List<string> ignoreLabels = new List<string>()
+        {
+            "person","people","human","hand","face",
+            "wall","floor","ceiling","door","window",
+            "table","desk","bed","couch","sofa","storage","cabinet","shelf",
+            "screen","tv","monitor",
+            "lamp","plant","picture","painting","wall_art",
+            "unknown","other","background"
+        };
+
+        [Header("Tracker Revalidation")]
+        public int maxMissingFrames = 30;
+        public float minSurfaceDistance = 0.5f;
+
         [Range(0.01f, 1f)] public float positionSmoothing = 0.5f;
         [Range(0.01f, 1f)] public float scaleSmoothing = 0.5f;
 
         [Header("Detection Filtering")]
-        [Range(0f, 1f)] public float scoreThreshold = 0.6f;
+        [Range(0f, 1f)] public float scoreThreshold = 0.4f;
 
         [Header("Label")]
         public float labelHeight = 0.05f;
         public float labelSize = 0.02f;
 
         // ===============================
-        // PUBLIC TRACKED OBJECT LIST
+        // DATA STRUCTURES
         // ===============================
         [System.Serializable]
         public class TrackedObjectData
         {
-            public string label; // CLEAN label (e.g. "laptop")
+            public string label;
             public GameObject box;
             public GameObject labelObject;
             public Vector3 position;
             public Vector3 scale;
             public float lastSeenTime;
+            public bool seenThisFrame;
+            public int missingFrameCount;
         }
 
         public List<TrackedObjectData> TrackedObjects = new List<TrackedObjectData>();
 
-        // ===============================
-        // Internal tracking state
-        // ===============================
         class TrackedItem
         {
             public TrackedObjectData data;
@@ -58,6 +88,9 @@ namespace Meta.XR.BuildingBlocks.AIBlocks
         private PassthroughCameraAccess _cam;
         private DepthTextureAccess _depth;
         private int _eyeIdx;
+
+        // 🔥 NEW: Unified world manager
+        private ObjectManager _objectManager;
 
         private struct FrameData
         {
@@ -75,6 +108,9 @@ namespace Meta.XR.BuildingBlocks.AIBlocks
             _cam = FindAnyObjectByType<PassthroughCameraAccess>();
             _depth = GetComponent<DepthTextureAccess>();
             _eyeIdx = _cam.CameraPosition == PassthroughCameraAccess.CameraPositionType.Left ? 0 : 1;
+
+            // 🔥 Find ObjectManager
+            _objectManager = FindAnyObjectByType<ObjectManager>();
         }
 
         private void OnEnable()
@@ -98,28 +134,21 @@ namespace Meta.XR.BuildingBlocks.AIBlocks
         }
 
         // ===============================
-        // Parse label like:
-        // "laptop 0.94"
-        // "cup (0.83)"
-        // "bottle: 0.71"
+        // LABEL PARSING
         // ===============================
         private bool ParseLabelAndScore(string raw, out string cleanLabel, out float score)
         {
             cleanLabel = raw;
             score = 1.0f;
-
-            if (string.IsNullOrEmpty(raw))
-                return false;
+            if (string.IsNullOrEmpty(raw)) return false;
 
             raw = raw.Trim();
 
-            // 1) Parentheses: "cup (0.83)"
             int idxParen = raw.LastIndexOf('(');
             if (idxParen >= 0 && raw.EndsWith(")"))
             {
                 string name = raw.Substring(0, idxParen).Trim();
                 string num = raw.Substring(idxParen + 1, raw.Length - idxParen - 2);
-
                 if (float.TryParse(num, NumberStyles.Any, CultureInfo.InvariantCulture, out float s))
                 {
                     cleanLabel = name;
@@ -128,13 +157,11 @@ namespace Meta.XR.BuildingBlocks.AIBlocks
                 }
             }
 
-            // 2) Colon: "cup: 0.83"
             int idxColon = raw.LastIndexOf(':');
             if (idxColon >= 0)
             {
                 string name = raw.Substring(0, idxColon).Trim();
                 string num = raw.Substring(idxColon + 1).Trim();
-
                 if (float.TryParse(num, NumberStyles.Any, CultureInfo.InvariantCulture, out float s))
                 {
                     cleanLabel = name;
@@ -143,13 +170,11 @@ namespace Meta.XR.BuildingBlocks.AIBlocks
                 }
             }
 
-            // 3) Space: "laptop 0.94"
             int idxSpace = raw.LastIndexOf(' ');
             if (idxSpace > 0)
             {
                 string name = raw.Substring(0, idxSpace).Trim();
                 string num = raw.Substring(idxSpace + 1).Trim();
-
                 if (float.TryParse(num, NumberStyles.Any, CultureInfo.InvariantCulture, out float s))
                 {
                     cleanLabel = name;
@@ -158,14 +183,13 @@ namespace Meta.XR.BuildingBlocks.AIBlocks
                 }
             }
 
-            // 4) Fallback: no score found
             cleanLabel = raw;
             score = 1.0f;
             return true;
         }
 
         // ===============================
-        // Find best tracker for detection
+        // IDENTITY LOGIC
         // ===============================
         private TrackedItem FindBestTracker(string label, Vector3 pos)
         {
@@ -175,7 +199,6 @@ namespace Meta.XR.BuildingBlocks.AIBlocks
             foreach (var t in _trackers)
             {
                 if (t.data.label != label) continue;
-
                 float d = Vector3.Distance(t.data.position, pos);
                 if (d < mergeDistance && d < bestDist)
                 {
@@ -183,46 +206,79 @@ namespace Meta.XR.BuildingBlocks.AIBlocks
                     best = t;
                 }
             }
-
             return best;
         }
 
+        private bool ExistsVeryClose(string label, Vector3 pos)
+        {
+            foreach (var t in _trackers)
+            {
+                if (t.data.label != label) continue;
+                if (Vector3.Distance(t.data.position, pos) < duplicateRejectDistance)
+                    return true;
+            }
+            return false;
+        }
+
+        private bool HasSameLabelNearby(string label, Vector3 pos, float radius)
+        {
+            foreach (var t in _trackers)
+            {
+                if (t.data.label != label) continue;
+                if (Vector3.Distance(t.data.position, pos) < radius)
+                    return true;
+            }
+            return false;
+        }
+
         // ===============================
-        // Main detection handler
+        // SURFACE VALIDATION
+        // ===============================
+        bool IsTrackerOnRealSurface(TrackedItem t)
+        {
+            Vector3 origin = _frame.Pose.position;
+            Vector3 dir = (t.data.position - origin).normalized;
+
+            if (Physics.Raycast(origin, dir, out RaycastHit hit, maxDepthDistance))
+            {
+                float d = Vector3.Distance(hit.point, t.data.position);
+                return d < minSurfaceDistance;
+            }
+
+            return false;
+        }
+
+        // ===============================
+        // MAIN HANDLER
         // ===============================
         private void HandleBatch(List<BoxData> batch)
         {
             float now = Time.time;
 
+            foreach (var t in _trackers)
+                t.data.seenThisFrame = false;
+
             foreach (var b in batch)
             {
-                // DEBUG: show raw label
-                // Debug.Log("[StableObjectTracker] RAW LABEL = " + b.label);
+                if (!ParseLabelAndScore(b.label, out string label, out float score)) continue;
 
-                if (!ParseLabelAndScore(b.label, out string label, out float score))
-                    continue;
+                label = label.ToLower();
+                if (ignoreLabels.Contains(label)) continue;
+                if (score < scoreThreshold) continue;
 
-                // DEBUG: show parsed result
-                // Debug.Log($"[StableObjectTracker] PARSED label='{label}' score={score}");
-
-                if (score < scoreThreshold)
-                    continue;
-
-                var xmin = b.position.x;
-                var ymin = b.position.y;
-                var xmax = b.scale.x;
-                var ymax = b.scale.y;
-
-                if (!TryProject(xmin, ymin, xmax, ymax, out var pos, out var rot, out var scl))
+                if (!TryProject(b.position.x, b.position.y, b.scale.x, b.scale.y, out var pos, out var rot, out var scl))
                     continue;
 
                 var tracker = FindBestTracker(label, pos);
 
+                if (tracker == null && ExistsVeryClose(label, pos))
+                    continue;
+
                 if (tracker == null)
                 {
-                    // ===============================
-                    // Create new tracker
-                    // ===============================
+                    if (HasSameLabelNearby(label, pos, maxNewObjectDistance))
+                        continue;
+
                     var box = Instantiate(boundingBoxPrefab);
 
                     var labelGO = new GameObject("Label_" + label);
@@ -245,7 +301,9 @@ namespace Meta.XR.BuildingBlocks.AIBlocks
                         labelObject = labelGO,
                         position = pos,
                         scale = scl,
-                        lastSeenTime = now
+                        lastSeenTime = now,
+                        seenThisFrame = true,
+                        missingFrameCount = 0
                     };
 
                     TrackedObjects.Add(data);
@@ -263,33 +321,49 @@ namespace Meta.XR.BuildingBlocks.AIBlocks
 
                     _trackers.Add(tracker);
 
-                    Debug.Log("[StableObjectTracker] Created box for " + label);
+                    // 🔥 SEND TO OBJECT MANAGER
+                    if (_objectManager != null)
+                        _objectManager.RegisterOrUpdate(label, box.transform);
                 }
                 else
                 {
                     tracker.data.lastSeenTime = now;
+                    tracker.data.seenThisFrame = true;
+                    tracker.data.missingFrameCount = 0;
+
                     tracker.targetPos = pos;
                     tracker.targetRot = rot;
                     tracker.targetScale = scl;
 
-                    // Update label text with latest score
-                    if (tracker.data.labelObject != null)
-                    {
-                        var tm = tracker.data.labelObject.GetComponent<TextMesh>();
-                        if (tm != null)
-                            tm.text = $"{label} ({score:0.00})";
-                    }
+                    // 🔥 UPDATE OBJECT MANAGER
+                    if (_objectManager != null)
+                        _objectManager.RegisterOrUpdate(label, tracker.data.box.transform);
                 }
             }
 
             // ===============================
-            // Remove lost trackers
+            // CLEANUP PASS
             // ===============================
             for (int i = _trackers.Count - 1; i >= 0; i--)
             {
                 var t = _trackers[i];
-                if (now - t.data.lastSeenTime > lostTimeout)
+
+                if (!t.data.seenThisFrame)
+                    t.data.missingFrameCount++;
+
+                bool shouldRemove = false;
+
+                if (t.data.missingFrameCount > maxMissingFrames)
+                    shouldRemove = true;
+
+                if (enableRaycastValidation && !IsTrackerOnRealSurface(t))
+                    shouldRemove = true;
+
+                if (shouldRemove)
                 {
+                    if (_objectManager != null)
+                        _objectManager.Remove(t.data.box.transform);
+
                     Destroy(t.data.box);
                     TrackedObjects.Remove(t.data);
                     _trackers.RemoveAt(i);
@@ -315,7 +389,6 @@ namespace Meta.XR.BuildingBlocks.AIBlocks
                 d.position = tr.position;
                 d.scale = tr.localScale;
 
-                // Billboard label
                 if (d.labelObject != null && cam != null)
                 {
                     Vector3 dir = d.labelObject.transform.position - cam.transform.position;
@@ -326,7 +399,7 @@ namespace Meta.XR.BuildingBlocks.AIBlocks
         }
 
         // ===============================
-        // Projection (unchanged)
+        // PROJECTION
         // ===============================
         public bool TryProject(float xmin, float ymin, float xmax, float ymax,
             out Vector3 world, out Quaternion rot, out Vector3 scale)
@@ -353,13 +426,20 @@ namespace Meta.XR.BuildingBlocks.AIBlocks
             var sy = Mathf.Clamp((int)(uv.y * texSize), 0, texSize - 1);
             var idx = _eyeIdx * texSize * texSize + sy * texSize + sx;
             var d = _frame.Depth[idx];
-            if (d <= 0 || d > 20 || float.IsInfinity(d)) return false;
+
+            if (d <= minDepthDistance || d > maxDepthDistance || float.IsInfinity(d))
+                return false;
 
             world = _frame.Pose.position + _frame.Pose.rotation * (dirCam * d);
             rot = Quaternion.LookRotation(world - _frame.Pose.position);
+
             var w = (xmax - xmin) / _frame.CameraIntrinsics.FocalLength.x * d;
             var h = (ymax - ymin) / _frame.CameraIntrinsics.FocalLength.y * d;
             scale = new Vector3(w, h, 1f);
+
+            if (scale.x < minObjectSize || scale.y < minObjectSize || scale.x > maxObjectSize || scale.y > maxObjectSize)
+                return false;
+
             return true;
         }
     }

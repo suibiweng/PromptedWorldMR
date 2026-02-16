@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: cf04321b5106b9f459b2337049c9e786
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 191966
+  packageName: Levers, Buttons, Switches - Pro
+  packageVersion: 2.1.1
+  assetPath: Assets/BigBlit/ActivePack/Scripts/Runtime/Input/DragControllerBase.cs
+  uploadId: 768426

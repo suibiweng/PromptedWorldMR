@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8631ae78f8bb4f5488dc40661e08ea4d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 191966
+  packageName: Levers, Buttons, Switches - Pro
+  packageVersion: 2.1.1
+  assetPath: Assets/BigBlit/LeversAndButtons/Animations/RotY_180.anim
+  uploadId: 768426

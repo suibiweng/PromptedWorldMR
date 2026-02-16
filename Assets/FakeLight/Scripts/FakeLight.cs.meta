@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 2693064c5c2b3ed47861708c1188d7bf
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {fileID: 2800000, guid: e81073f8bf1f8594eb71e0e60433e272, type: 3}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308829
+  packageName: FakeLight | Light Beam & Point Light
+  packageVersion: 2.0
+  assetPath: Assets/FakeLight/Scripts/FakeLight.cs
+  uploadId: 841116

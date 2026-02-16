@@ -686,6 +686,7 @@ GameObject:
   - component: {fileID: 918196740110979837}
   - component: {fileID: -4033489437336678575}
   - component: {fileID: -256418291513411979}
+  - component: {fileID: 8837229132581310462}
   m_Layer: 0
   m_Name: ProgramableObject
   m_TagString: Selectable
@@ -834,6 +835,7 @@ MonoBehaviour:
   _rigidbody: {fileID: 2166428522671695660}
   _kinematicWhileSelected: 1
   _throwWhenUnselected: 1
+  _forceKinematicDisabled: 0
 --- !u!114 &6842033889762767591
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -936,6 +938,8 @@ MonoBehaviour:
   addBoxColliderIfMissing: 0
   exposeProgramableProxy: 1
   _currentLuaPreview: 
+  iotManager: {fileID: 0}
+  pokeButton: {fileID: 0}
 --- !u!65 &-256418291513411979
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -957,6 +961,19 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.99999994, y: 0.99999994, z: 0.99999994}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &8837229132581310462
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7692451994609705636}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 811ed0d4463da4fbf93ff64f6c550348, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  manager: {fileID: 0}
 --- !u!1 &8102332530202665709
 GameObject:
   m_ObjectHideFlags: 0

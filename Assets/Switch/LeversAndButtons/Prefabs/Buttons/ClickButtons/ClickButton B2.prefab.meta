@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1e572ed70be814740a855ecfc077decd
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 191966
+  packageName: Levers, Buttons, Switches - Pro
+  packageVersion: 2.1.1
+  assetPath: Assets/BigBlit/LeversAndButtons/Prefabs/Buttons/ClickButtons/ClickButton
+    B2.prefab
+  uploadId: 768426

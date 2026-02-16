@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 6e153b2fe0d84ef439386db8ee1063de
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308829
+  packageName: FakeLight | Light Beam & Point Light
+  packageVersion: 2.0
+  assetPath: Assets/FakeLight/Demo/HDRP/FakeLight HDRP/Global Volume Profile.asset
+  uploadId: 841116

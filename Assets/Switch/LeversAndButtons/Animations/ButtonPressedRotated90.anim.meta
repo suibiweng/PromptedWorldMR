@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ae650801518bb3e43b20b619135af77c
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 191966
+  packageName: Levers, Buttons, Switches - Pro
+  packageVersion: 2.1.1
+  assetPath: Assets/BigBlit/LeversAndButtons/Animations/ButtonPressedRotated90.anim
+  uploadId: 768426

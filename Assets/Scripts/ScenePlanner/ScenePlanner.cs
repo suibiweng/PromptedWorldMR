@@ -68,25 +68,79 @@ public class ScenePlanner : MonoBehaviour
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success)
+        {
+            Debug.LogError("[ScenePlanner] OpenAI request failed: " + www.error);
             yield break;
+        }
 
         var resp = JsonUtility.FromJson<ChatResponse>(www.downloadHandler.text);
         if (resp == null || resp.choices == null || resp.choices.Count == 0)
+        {
+            Debug.LogError("[ScenePlanner] Invalid OpenAI response");
             yield break;
+        }
 
         rawScenePlanJson = ScenePlanJsonCleaner.Clean(
             resp.choices[0].message.content
         );
 
+        if (string.IsNullOrWhiteSpace(rawScenePlanJson))
+        {
+            Debug.LogError("[ScenePlanner] Cleaned ScenePlan JSON is empty");
+            yield break;
+        }
+
         parsedPlan = JsonUtility.FromJson<ScenePlan>(rawScenePlanJson);
 
-        if (ScenePlanValidator.Validate(parsedPlan))
+        if (!ScenePlanValidator.Validate(parsedPlan))
         {
-            Debug.Log("[ScenePlanner] ScenePlan OK:\n" + rawScenePlanJson);
-
-            if (worldBuilder != null)
-                worldBuilder.Build(parsedPlan);
+            Debug.LogError("[ScenePlanner] ScenePlan validation failed.");
+            yield break;
         }
+
+        // ===================== MAIN DEBUG PRINT =====================
+        Debug.Log("[ScenePlanner] ScenePlan OK:\n" + rawScenePlanJson);
+
+        // -------- Debug: objects + interactive flags --------
+        if (parsedPlan.objects != null)
+        {
+            Debug.Log("[ScenePlanner][DEBUG] Objects:");
+            foreach (var o in parsedPlan.objects)
+            {
+                Debug.Log(
+                    $"[ScenePlanner][DEBUG]   Object: {o.id}, primitive={o.primitive}, count={o.count}, role={o.role}, interactive={o.interactive}"
+                );
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[ScenePlanner][DEBUG] objects list is NULL");
+        }
+
+        // -------- Debug: planned_behaviors --------
+        if (parsedPlan.planned_behaviors == null)
+        {
+            Debug.LogWarning("[ScenePlanner][DEBUG] planned_behaviors is NULL");
+        }
+        else if (parsedPlan.planned_behaviors.Count == 0)
+        {
+            Debug.LogWarning("[ScenePlanner][DEBUG] planned_behaviors is EMPTY");
+        }
+        else
+        {
+            Debug.Log("[ScenePlanner][DEBUG] planned_behaviors:");
+            foreach (var pb in parsedPlan.planned_behaviors)
+            {
+                Debug.Log(
+                    $"[ScenePlanner][DEBUG]   target = {pb.target}, intent = {pb.intent}"
+                );
+            }
+        }
+
+        // ======================================================
+
+        if (worldBuilder != null)
+            worldBuilder.Build(parsedPlan);
     }
 
     private string LoadApiKey()
@@ -98,9 +152,32 @@ public class ScenePlanner : MonoBehaviour
         return ta ? ta.text.Trim() : null;
     }
 
-    // DTOs
-    [Serializable] private class Message { public string role; public string content; }
-    [Serializable] private class ChatRequest { public string model; public float temperature; public List<Message> messages; }
-    [Serializable] private class Choice { public Message message; }
-    [Serializable] private class ChatResponse { public List<Choice> choices; }
+    // ===================== DTOs =====================
+
+    [Serializable]
+    private class Message
+    {
+        public string role;
+        public string content;
+    }
+
+    [Serializable]
+    private class ChatRequest
+    {
+        public string model;
+        public float temperature;
+        public List<Message> messages;
+    }
+
+    [Serializable]
+    private class Choice
+    {
+        public Message message;
+    }
+
+    [Serializable]
+    private class ChatResponse
+    {
+        public List<Choice> choices;
+    }
 }

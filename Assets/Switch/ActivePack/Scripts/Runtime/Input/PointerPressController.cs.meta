@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 3b132acaaf56e9442b6dd8415629a24f
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 191966
+  packageName: Levers, Buttons, Switches - Pro
+  packageVersion: 2.1.1
+  assetPath: Assets/BigBlit/ActivePack/Scripts/Runtime/Input/PointerPressController.cs
+  uploadId: 768426

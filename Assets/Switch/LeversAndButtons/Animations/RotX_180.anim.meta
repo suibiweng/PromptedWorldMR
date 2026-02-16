@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 51bb3d8737c22e443b2d1a335326cc89
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 191966
+  packageName: Levers, Buttons, Switches - Pro
+  packageVersion: 2.1.1
+  assetPath: Assets/BigBlit/LeversAndButtons/Animations/RotX_180.anim
+  uploadId: 768426

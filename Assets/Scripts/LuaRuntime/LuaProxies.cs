@@ -306,87 +306,87 @@ namespace LuaProxies
     // RigidbodyProxy
     // ------------------------------------------------------------
     [MoonSharpUserData]
-    public class RigidbodyProxy
+public class RigidbodyProxy
+{
+    private readonly Rigidbody _rb;
+    public RigidbodyProxy(Rigidbody rb) => _rb = rb;
+
+    private void EnsureDynamicIfPhysics()
     {
-        private readonly Rigidbody _rb;
-        public RigidbodyProxy(Rigidbody rb) => _rb = rb;
-
-        // NEW: helper to auto-un-kinematic when doing physics
-        private void EnsureDynamicIfPhysics()
-        {
-            if (_rb == null) return;
-            if (_rb.isKinematic) _rb.isKinematic = false;
-        }
-
-        public void AddForce(Vector3 force)
-        {
-            EnsureDynamicIfPhysics();
-            _rb.AddForce(force);
-        }
-
-        public void SetVelocity(Vector3 velocity)
-        {
-            EnsureDynamicIfPhysics();
-            _rb.linearVelocity = velocity;
-        }
-
-        public void AddForce(float x, float y, float z)
-        {
-            EnsureDynamicIfPhysics();
-            _rb.AddForce(new Vector3(x, y, z));
-        }
-
-        public void SetVelocity(float x, float y, float z)
-        {
-            EnsureDynamicIfPhysics();
-            _rb.linearVelocity = new Vector3(x, y, z);
-        }
-
-        // --- Add to RigidbodyProxy ---
-
-        // Query current kinematic state
-        public bool GetIsKinematic() => _rb.isKinematic;
-
-        // Preferred setter (method-style API)
-        public void SetIsKinematic(bool k) => _rb.isKinematic = k;
-
-        // Back-compat alias (so Lua can call self.rigidbody:SetKinematic(false))
-        public void SetKinematic(bool k) => _rb.isKinematic = k;
-
-        // Optional: gravity getter for symmetry with SetUseGravity(...)
-        public bool GetUseGravity() => _rb.useGravity;
-
-        public void AddForce(Vector3 force, string mode)
-        {
-            EnsureDynamicIfPhysics();
-            if (!System.Enum.TryParse(mode, true, out ForceMode fm)) fm = ForceMode.Force;
-            _rb.AddForce(force, fm);
-        }
-
-        public void AddForce(float x, float y, float z, string mode)
-        {
-            EnsureDynamicIfPhysics();
-            if (!System.Enum.TryParse(mode, true, out ForceMode fm)) fm = ForceMode.Force;
-            _rb.AddForce(new Vector3(x, y, z), fm);
-        }
-
-        public Vector3 GetVelocity() => _rb.linearVelocity;
-
-        public void SetUseGravity(bool useGravity)
-        {
-            if (useGravity) EnsureDynamicIfPhysics();
-            _rb.useGravity = useGravity;
-        }
-
-        public float GetMass() => _rb.mass;
-        public void SetMass(float mass) => _rb.mass = mass;
-
-        public void AddImpulse(float x, float y, float z)
-        {
-            EnsureDynamicIfPhysics();
-            _rb.AddForce(new Vector3(x, y, z), ForceMode.Impulse);
-        }
+        if (_rb == null) return;
+        if (_rb.isKinematic) _rb.isKinematic = false;
     }
+
+    // -------- Gravity --------
+    public void SetUseGravity(bool useGravity)
+    {
+        if (useGravity) EnsureDynamicIfPhysics();
+        _rb.useGravity = useGravity;
+    }
+
+    public bool GetUseGravity() => _rb.useGravity;
+
+    // -------- Kinematic --------
+    public bool GetIsKinematic() => _rb.isKinematic;
+    public void SetIsKinematic(bool k) => _rb.isKinematic = k;
+    public void SetKinematic(bool k) => _rb.isKinematic = k;
+
+    // -------- Force --------
+    public void AddForce(Vector3 force)
+    {
+        EnsureDynamicIfPhysics();
+        _rb.AddForce(force);
+    }
+
+    public void AddForce(Vector3 force, string mode)
+    {
+        EnsureDynamicIfPhysics();
+        if (!Enum.TryParse(mode, true, out ForceMode fm)) fm = ForceMode.Force;
+        _rb.AddForce(force, fm);
+    }
+
+    public void AddForce(float x, float y, float z)
+    {
+        EnsureDynamicIfPhysics();
+        _rb.AddForce(new Vector3(x, y, z));
+    }
+
+    public void AddForce(float x, float y, float z, string mode)
+    {
+        EnsureDynamicIfPhysics();
+        if (!Enum.TryParse(mode, true, out ForceMode fm)) fm = ForceMode.Force;
+        _rb.AddForce(new Vector3(x, y, z), fm);
+    }
+
+    public void AddImpulse(float x, float y, float z)
+    {
+        EnsureDynamicIfPhysics();
+        _rb.AddForce(new Vector3(x, y, z), ForceMode.Impulse);
+    }
+
+    // -------- Velocity --------
+    public void SetVelocity(Vector3 v)
+    {
+        EnsureDynamicIfPhysics();
+        _rb.linearVelocity = v;
+    }
+
+    public void SetVelocity(float x, float y, float z)
+    {
+        EnsureDynamicIfPhysics();
+        _rb.linearVelocity = new Vector3(x, y, z);
+    }
+
+    public Vector3Proxy GetVelocity()
+    {
+        return new Vector3Proxy(_rb.linearVelocity);
+    }
+
+    // -------- Mass --------
+    public float GetMass() => _rb.mass;
+    public void SetMass(float m) => _rb.mass = m;
+}
+
 
     // ------------------------------------------------------------
     // AudioSourceProxy
@@ -435,71 +435,53 @@ namespace LuaProxies
     // CollisionProxy
     // ------------------------------------------------------------
     [MoonSharpUserData]
-    public class CollisionProxy
+
+public class CollisionProxy
+{
+    private readonly Collision _collision;
+    public CollisionProxy(Collision c) => _collision = c;
+
+    public GameObjectProxy GetGameObject()
+        => new GameObjectProxy(_collision.gameObject);
+
+    public Vector3Proxy GetContactPoint()
+        => new Vector3Proxy(_collision.contacts.Length > 0 
+            ? _collision.contacts[0].point 
+            : Vector3.zero);
+
+    public Vector3Proxy GetContactNormal()
+        => new Vector3Proxy(_collision.contacts.Length > 0
+            ? _collision.contacts[0].normal
+            : Vector3.up);
+
+    public int GetContactCount()
+        => _collision.contacts?.Length ?? 0;
+
+    // ⭐ MISSING METHOD ADDED
+    public Vector3Proxy GetContactPointAt(int i)
     {
-        private readonly Collision _collision;
-        public CollisionProxy(Collision collision) => _collision = collision;
+        if (_collision.contacts == null ||
+            i < 0 || i >= _collision.contacts.Length)
+            return new Vector3Proxy(Vector3.zero);
 
-        // Existing API (kept as-is)
-        public GameObjectProxy GetGameObject()
-            => (_collision != null && _collision.gameObject != null) ? new GameObjectProxy(_collision.gameObject) : null;
-
-        public Vector3Proxy GetContactPoint()
-        {
-            var p = (_collision != null && _collision.contacts != null && _collision.contacts.Length > 0)
-                ? _collision.contacts[0].point
-                : Vector3.zero;
-            return new Vector3Proxy(p);
-        }
-
-        public Vector3Proxy GetRelativeVelocity()
-        {
-            var v = (_collision != null) ? _collision.relativeVelocity : Vector3.zero;
-            return new Vector3Proxy(v);
-        }
-
-        public string GetName()
-            => (_collision != null && _collision.gameObject != null) ? _collision.gameObject.name : string.Empty;
-
-        public RigidbodyProxy GetRigidbodyProxy()
-        {
-            if (_collision != null && _collision.rigidbody != null)
-                return new RigidbodyProxy(_collision.rigidbody);
-
-            var go = _collision != null ? _collision.gameObject : null;
-            if (go != null && go.TryGetComponent<Rigidbody>(out var rb))
-                return new RigidbodyProxy(rb);
-
-            return null;
-        }
-
-        public int GetContactCount()
-            => (_collision != null && _collision.contacts != null) ? _collision.contacts.Length : 0;
-
-        public Vector3Proxy GetContactNormal()
-        {
-            var n = (_collision != null && _collision.contacts != null && _collision.contacts.Length > 0)
-                ? _collision.contacts[0].normal
-                : Vector3.up;
-            return new Vector3Proxy(n);
-        }
-
-        // NEW: root-level helpers so Lua can detect the parent's name
-        public GameObjectProxy GetRootGameObject()
-        {
-            if (_collision == null) return null;
-            var tr = _collision.transform;
-            if (tr == null) return null;
-            return new GameObjectProxy(tr.root.gameObject);
-        }
-
-        public string GetRootName()
-        {
-            if (_collision == null) return string.Empty;
-            var tr = _collision.transform;
-            return tr != null ? tr.root.name : string.Empty;
-        }
+        return new Vector3Proxy(_collision.contacts[i].point);
     }
+
+    public Vector3Proxy GetRelativeVelocity()
+        => new Vector3Proxy(_collision.relativeVelocity);
+
+    public RigidbodyProxy GetRigidbodyProxy()
+        => _collision.rigidbody != null
+            ? new RigidbodyProxy(_collision.rigidbody)
+            : null;
+
+    public GameObjectProxy GetRootGameObject()
+        => new GameObjectProxy(_collision.transform.root.gameObject);
+
+    public string GetRootName()
+        => _collision.transform.root.name;
+}
+
 
     // ------------------------------------------------------------
     // ParticleSystemProxy
@@ -695,6 +677,120 @@ namespace LuaProxies
         public string phase
         {
             get { return _state != null ? _state.phase.ToString() : "None"; }
+        }
+    }
+
+
+
+
+    [MoonSharpUserData]
+public class IoTProxy
+{
+    IOTManager manager;
+
+    public IoTProxy(IOTManager m)
+    {
+        manager = m;
+    }
+
+    public void On(string id)
+    {
+        manager?.TurnOn(id);
+    }
+
+    public void Off(string id)
+    {
+        manager?.TurnOff(id);
+    }
+
+    public void Send(string id, string cmd)
+    {
+        manager?.SendCommand(id, cmd);
+    }
+}
+
+
+[MoonSharpUserData]
+
+public class PokeButtonProxy
+{
+    private readonly PokeButton _btn;
+
+    public PokeButtonProxy(PokeButton btn)
+    {
+        _btn = btn;
+    }
+
+    public bool is_pressed => _btn != null && _btn.IsPressed;
+    public bool pressed_this_frame => _btn != null && _btn.WasPressedThisFrame;
+    public bool released_this_frame => _btn != null && _btn.WasReleasedThisFrame;
+
+    // ✅ Toggle mode
+    public bool toggle => _btn != null && _btn.ToggleState;
+}
+
+
+
+
+    [MoonSharpUserData]
+    public class CustomCollisionProxy
+    {
+        private readonly GameObject _self;
+        private readonly GameObject _other;
+
+        public CustomCollisionProxy(GameObject self, GameObject other)
+        {
+            _self = self;
+            _other = other;
+        }
+
+        // -----------------------------
+        // Basic identity
+        // -----------------------------
+        public GameObjectProxy GetGameObject()
+            => _other != null ? new GameObjectProxy(_other) : null;
+
+        public GameObjectProxy GetRootGameObject()
+            => _other != null
+                ? new GameObjectProxy(_other.transform.root.gameObject)
+                : null;
+
+        public string GetRootName()
+            => _other != null
+                ? _other.transform.root.name
+                : "";
+
+        // -----------------------------
+        // Physics-like data (not available)
+        // Return safe defaults
+        // -----------------------------
+        public Vector3Proxy GetContactPoint()
+            => new Vector3Proxy(Vector3.zero);
+
+        public Vector3Proxy GetContactNormal()
+            => new Vector3Proxy(Vector3.up);
+
+        public int GetContactCount()
+            => 0;
+
+        public Vector3Proxy GetContactPointAt(int i)
+            => new Vector3Proxy(Vector3.zero);
+
+        public Vector3Proxy GetRelativeVelocity()
+            => new Vector3Proxy(Vector3.zero);
+
+        // -----------------------------
+        // Rigidbody (optional)
+        // -----------------------------
+        public RigidbodyProxy GetRigidbodyProxy()
+        {
+            if (_other != null &&
+                _other.TryGetComponent<Rigidbody>(out var rb))
+            {
+                return new RigidbodyProxy(rb);
+            }
+
+            return null;
         }
     }
 

@@ -1,0 +1,9 @@
+fileFormatVersion: 2
+guid: a19a778540dad6947af5d2e15c09b194
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308829
+  packageName: FakeLight | Light Beam & Point Light
+  packageVersion: 2.0
+  assetPath: Assets/FakeLight/Scripts/Editor/FakeLightEditor.cs
+  uploadId: 841116

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: b7fdc79058270af4ea30c41a1d9cf1bc
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308829
+  packageName: FakeLight | Light Beam & Point Light
+  packageVersion: 2.0
+  assetPath: Assets/FakeLight/Demo/Built-in/FakeLight Built-in.unity
+  uploadId: 841116

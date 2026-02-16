@@ -9,12 +9,16 @@ public class ScenePlan
     public string scene_type;
     public string summary;
 
-    // 🔹 NEW: scene-level layout intent (natural language)
+    // 🔹 scene-level layout intent (natural language)
     public string layout_prompt;
 
     public List<SceneObject> objects = new();
     public List<SceneSystem> systems = new();
     public List<SceneUI> ui = new();
+
+    // ===================== NEW (OPTIONAL) =====================
+    // If null or empty, system behaves EXACTLY as before
+    public List<PlannedBehavior> planned_behaviors = new();
 }
 
 [Serializable]
@@ -25,6 +29,17 @@ public class SceneObject
     public int count = 1;
     public string role;
     public bool interactive;
+}
+
+// ===================== NEW =====================
+[Serializable]
+public class PlannedBehavior
+{
+    // Prefix or exact id, e.g. "BOWLING_PINS"
+    public string target;
+
+    // Natural language intent for this group/object
+    public string intent;
 }
 
 [Serializable]

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8f70ba35c4e857d448889e52354254ca
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308829
+  packageName: FakeLight | Light Beam & Point Light
+  packageVersion: 2.0
+  assetPath: Assets/FakeLight/Demo/URP/FakeLight URP/Global Volume Profile.asset
+  uploadId: 841116

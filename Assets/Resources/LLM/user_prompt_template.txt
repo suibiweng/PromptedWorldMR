@@ -1,84 +1,101 @@
-Task: Generate Lua that controls a Unity GameObject using MoonSharp + DOTween proxies.
+Task: Generate Lua that controls a Unity GameObject using MoonSharp proxies.
+
 GameObject display name: {OBJECT_NAME}
 
-SCENE_CONTEXT (optional; may be empty):
+SCENE_CONTEXT:
 {SCENE_CONTEXT}
 
 User intent:
 {INTENT}
 
-CURRENT_LUA (optional, for edit-in-place):
+CURRENT_LUA:
 {CURRENT_LUA}
 
-Contract (required function signatures):
+AVAILABLE_IOT_DEVICES:
+{IOT_DEVICES}
+
+--------------------------------------------------
+IOT
+--------------------------------------------------
+- You may use iot:On(id) or iot:Off(id)
+- Only use IDs from the list
+- Only use IoT if user intent clearly involves real-world device control
+- If no relevant device exists, do not use iot
+
+--------------------------------------------------
+CONTRACT (required)
+--------------------------------------------------
 function start(self)
 function update(self, deltaTime)
 function on_trigger(self, other)
 function on_collision(self, col)
 
-Transform access (preferred):
-- Read/write via proxy properties:
-  local p = self.transform.position
-  p.x = p.x + 1
-  self.transform.position = { x = p.x, y = p.y, z = p.z }
-- Also valid: self.transform.localPosition, self.transform.localScale, self.transform.eulerAngles
+--------------------------------------------------
+PROXY USAGE
+--------------------------------------------------
+- Only use provided proxies (transform, rigidbody, particles, etc.)
+- NEVER call Unity APIs like GetComponent, AddComponent, etc.
+- Use proxy properties, not SetX methods
 
-Collision access (very important):
-- self is always the GameObject with LuaBehaviour + Rigidbody (usually the parent).
-- Child colliders are treated as a compound collider of the parent.
-- In on_collision(self, col):
-  - Use self.transform.name (or ProgramableObject/GetId) for this object’s name.
-  - Use col:GetRootName() for the OTHER object’s top-level parent name.
-  - Do NOT assume child collider names; always use the root name when matching e.g. DESK, WALL, FLOOR.
-- Example pattern:
-  function on_collision(self, col)
-    local my_name = self.transform.name
-    local other_root = col:GetRootName()
-    if other_root == "DESK" then
-      if self.particles then self.particles:Play() end
-    end
-  end
-IMPORTANT: Matching objects with multiple runtime instances
+Transform example:
+local p = self.transform.position
+p.y = p.y + 1
+self.transform.position = {x=p.x,y=p.y,z=p.z}
 
-- Scene objects may expand into multiple runtime instances by appending numeric suffixes.
-  Example:
-    Planner ID: OBJECT_NAME
-    Runtime names: OBJECT_NAME_1, OBJECT_NAME_2, OBJECT_NAME_3, ...
+--------------------------------------------------
+COLLISION
+--------------------------------------------------
+- self is always the parent object
+- Collisions may come from TWO systems:
+  1) Unity physics collisions
+  2) Custom bounds collisions (CollisionManager + SimpleCollidable)
+- Lua always receives: on_collision(self, col)
+- Use col:GetRootName() for the other object
+- NEVER rely on exact equality
+- Use prefix or pattern matching
+- Do NOT rely on contact-point / normal / relative-velocity data
+  (bounds collisions do not provide real contact information)
 
-- Therefore, NEVER rely on exact string equality when matching object names in collisions.
-
-  This is WRONG:
-    if other_root == "OBJECT_NAME" then ...
-
-- You MUST use prefix-based or pattern-based matching to identify object categories.
-
-- Preferred pattern-based prefix match (Lua string pattern):
-    if string.match(other_root, "^OBJECT_NAME") then
-        -- matches OBJECT_NAME, OBJECT_NAME_1, OBJECT_NAME_12, etc.
-    end
-
-- Alternative acceptable prefix check:
-    if string.sub(other_root, 1, #OBJECT_NAME) == OBJECT_NAME then
-        ...
-    end
-
-- Always obtain the other object’s name using:
-    local other_root = col:GetRootName()
+Example:
+local other = col:GetRootName()
+if string.match(other, "^DESK") then
+    if self.particles then self.particles:Play() end
+end
 
 
-DOTween usage:
-- Create tweens in start(self) or on_trigger(self, other), not every frame in update.
-- Examples:
-  -- dotween:MoveTo(self.transform, 0, 1, 0, 1.2, 'OutQuad')
-  -- dotween:ScaleTo(self.transform, 1.5, 1.5, 1.5, 0.5, 'InOutSine')
+--------------------------------------------------
+DOTWEEN (optional)
+--------------------------------------------------
+Only use if user explicitly requests animation or movement.
 
-Rules:
-- Output ONLY valid Lua (no markdown, no explanations).
-- Use update(self, deltaTime) for continuous logic; on_trigger/on_collision for events.
-- Don’t reference Time.deltaTime directly; use deltaTime parameter.
-- Durations in seconds; vectors are tables {x=..., y=..., z=...}.
-- Names you set (transform.name or gameObject:SetName) will automatically be uppercased and spaces will be replaced with underscores.
-- Do NOT add any animation or DOTween calls unless the user explicitly asks for movement/animation/effects.
-- When enabling gravity or applying forces/impulses/velocities on a Rigidbody, the runtime automatically turns off isKinematic for you.
-- Do NOT call SetIsKinematic(...) or SetKinematic(...) unless the user explicitly asks for "kinematic", "freeze in place", or similar behavior.
-- Objects may have multiple runtime instances; do NOT rely on exact-name equality to identify other objects. Prefer prefix/pattern/role-based matching when identifying categories of objects.
+Examples:
+dotween:MoveTo(self.transform, 0,1,0, 1.0, "OutQuad")
+dotween:ScaleTo(self.transform, 1.2,1.2,1.2, 0.5, "InOutSine")
+
+Create tweens in start or on_trigger, not every frame.
+
+--------------------------------------------------
+PHYSICS
+--------------------------------------------------
+- Do NOT call SetIsKinematic unless explicitly requested
+- Engine auto-handles physics state when using gravity or forces
+
+--------------------------------------------------
+EDIT-IN-PLACE
+--------------------------------------------------
+If CURRENT_LUA is not empty:
+- Modify it instead of rewriting from scratch
+- Preserve existing logic unless user intent changes it
+
+--------------------------------------------------
+OUTPUT RULES
+--------------------------------------------------
+- Return ONLY Lua code
+- No markdown
+- No explanations
+- No debug prints or logs
+- Use deltaTime parameter, not Time.deltaTime
+- Durations in seconds
+- Vectors are tables {x,y,z}
+- Names auto-normalize to uppercase
+- Do not use exact-name matching for objects
