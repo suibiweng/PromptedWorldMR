@@ -21,7 +21,7 @@ using LuaProxies;
 ///   on_collision_enter(self, col)
 ///   on_collision_stay(self, col)
 ///   on_collision_exit(self, col)
-/// - Falls back to on_collision(self, col) if those do not exist.
+/// - Falls back to on_collision(self, col) only for collision entry.
 ///
 /// NOTE:
 /// - Unity physics collisions (OnCollisionEnter) can be disabled via useUnityPhysicsCollisions.
@@ -64,7 +64,7 @@ public class LuaBehaviour : MonoBehaviour
 
     [Header("Legacy (optional)")]
     [Tooltip("If true, self.programable / self.programmable / self.programableObject will be exposed.")]
-    public bool exposeProgramableProxy = false;
+    public bool exposeProgramableProxy = true;
 
     [Header("Current Lua (preview)")]
     [SerializeField, TextArea(6, 30)] private string _currentLuaPreview;
@@ -74,6 +74,7 @@ public class LuaBehaviour : MonoBehaviour
     private Script _script;
     private Table _self;
     private DynValue _fnStart, _fnUpdate, _fnOnTrigger, _fnOnCollision, _fnOnStopOptional;
+    private LuaDOTween _dotween;
 
     // Run-session state
     private bool _hasRunStartPose;
@@ -81,6 +82,7 @@ public class LuaBehaviour : MonoBehaviour
 
     [Header("External Systems")]
     public IOTManager iotManager; // optional; auto-find in Awake if null
+    public PromptedWorldManager promptedWorldManager; // optional; auto-find in Awake if null
 
     [Header("Optional Button")]
     public PokeButton pokeButton; // optional; binds self.button (and self.poke alias)
@@ -92,6 +94,8 @@ public class LuaBehaviour : MonoBehaviour
     {
         if (iotManager == null)
             iotManager = FindAnyObjectByType<IOTManager>();
+        if (promptedWorldManager == null)
+            promptedWorldManager = FindAnyObjectByType<PromptedWorldManager>();
 
         // Safe: registers all public userdata types in loaded assemblies (idempotent).
         UserData.RegisterAssembly();
@@ -119,6 +123,7 @@ public class LuaBehaviour : MonoBehaviour
     {
         runEnabled = false;
         SafeCall(_fnOnStopOptional);
+        KillLuaTweens();
         if (resetPositionOnStop) ResetToRunStartPosition();
 
         if (makeRigidbodyKinematicOnStop)
@@ -127,7 +132,7 @@ public class LuaBehaviour : MonoBehaviour
             if (rb != null)
             {
                 rb.isKinematic = true;
-                rb.velocity = Vector3.zero;        // ✅ Unity Rigidbody uses velocity
+                rb.linearVelocity = Vector3.zero;        // ✅ Unity Rigidbody uses velocity
                 rb.angularVelocity = Vector3.zero;
             }
         }
@@ -225,9 +230,8 @@ public class LuaBehaviour : MonoBehaviour
 
         try
         {
-            // Prefer specific phase handler if present; else fall back to on_collision
             DynValue fn = _script.Globals.Get(preferredFnName);
-            if (fn == null || fn.Type != DataType.Function)
+            if ((fn == null || fn.Type != DataType.Function) && preferredFnName == "on_collision_enter")
                 fn = _fnOnCollision;
 
             if (fn == null || fn.Type != DataType.Function)
@@ -255,11 +259,16 @@ public class LuaBehaviour : MonoBehaviour
             return;
         }
 
+        KillLuaTweens();
         CompileBind(luaText);
 
         if (callStart)
         {
             StartRun();
+        }
+        else
+        {
+            runEnabled = false;
         }
     }
 
@@ -293,7 +302,10 @@ public class LuaBehaviour : MonoBehaviour
         UserData.RegisterType<PromptedMatterProxy>();
         UserData.RegisterType<TouchpadInputProxy>();
         UserData.RegisterType<IoTProxy>();
+        UserData.RegisterType<LightBulbProxy>();
         UserData.RegisterType<PokeButtonProxy>();
+        UserData.RegisterType<UserAnchorProxy>();
+        UserData.RegisterType<SceneLookupProxy>();
 
         // ✅ Custom collision proxy (bounds-based)
         UserData.RegisterType<CustomCollisionProxy>();
@@ -311,8 +323,15 @@ public class LuaBehaviour : MonoBehaviour
         // Global IoT (matches your prompt docs: global iot)
         _script.Globals["iot"] = new IoTProxy(iotManager);
 
+        var userProxy = new UserAnchorProxy(promptedWorldManager, transform);
+        _script.Globals["user"] = userProxy;
+
+        var sceneProxy = new SceneLookupProxy(promptedWorldManager, transform);
+        _script.Globals["scene"] = sceneProxy;
+        _script.Globals["world"] = sceneProxy;
+
         // DOTween: inject a fresh helper per-script
-        LuaDOTweenBootstrap.InjectInto(_script); // provides global 'dotween'
+        _dotween = LuaDOTweenBootstrap.InjectInto(_script); // provides global 'dotween'
 
         // Create self table with lazy __index to auto-bind proxies on demand
         _self = new Table(_script);
@@ -338,6 +357,24 @@ public class LuaBehaviour : MonoBehaviour
                 case "transform":
                     bound = UserData.Create(new TransformProxy(transform));
                     break;
+
+                case "shape":
+                case "shapeTransform":
+                {
+                    var po = GetComponent<ProgramableObject>();
+                    var shapeTransform = po != null ? po.GetLuaShapeTransform() : null;
+                    if (shapeTransform != null) bound = UserData.Create(new TransformProxy(shapeTransform));
+                    break;
+                }
+
+                case "shapeObject":
+                case "visualShape":
+                {
+                    var po = GetComponent<ProgramableObject>();
+                    var shapeObject = po != null ? po.GetLuaShapeObject() : null;
+                    if (shapeObject != null) bound = UserData.Create(new GameObjectProxy(shapeObject));
+                    break;
+                }
 
                 case "rigidbody":
                 {
@@ -390,6 +427,12 @@ public class LuaBehaviour : MonoBehaviour
                 case "poke":
                 {
                     if (pokeButton != null) bound = UserData.Create(new PokeButtonProxy(pokeButton));
+                    break;
+                }
+
+                case "user":
+                {
+                    bound = UserData.Create(new UserAnchorProxy(promptedWorldManager, transform));
                     break;
                 }
 
@@ -450,6 +493,28 @@ public class LuaBehaviour : MonoBehaviour
         // Eager-bind must-haves:
         _self["gameObject"] = UserData.Create(new GameObjectProxy(gameObject));
         _self["transform"] = UserData.Create(new TransformProxy(transform));
+        _self["user"] = UserData.Create(userProxy);
+        _self["scene"] = UserData.Create(sceneProxy);
+        _self["world"] = UserData.Create(sceneProxy);
+
+        var programableObject = GetComponent<ProgramableObject>();
+        if (programableObject != null)
+        {
+            var shapeTransform = programableObject.GetLuaShapeTransform();
+            var shapeObject = programableObject.GetLuaShapeObject();
+            if (shapeTransform != null)
+            {
+                var shapeProxy = UserData.Create(new TransformProxy(shapeTransform));
+                _self["shape"] = shapeProxy;
+                _self["shapeTransform"] = shapeProxy;
+            }
+            if (shapeObject != null)
+            {
+                var shapeObjectProxy = UserData.Create(new GameObjectProxy(shapeObject));
+                _self["shapeObject"] = shapeObjectProxy;
+                _self["visualShape"] = shapeObjectProxy;
+            }
+        }
 
         // (Optional) also eager-bind button if present so LLM scripts can use self.button immediately
         if (pokeButton != null)
@@ -490,6 +555,12 @@ public class LuaBehaviour : MonoBehaviour
             var msg = string.IsNullOrEmpty(ex.DecoratedMessage) ? ex.Message : ex.DecoratedMessage;
             Debug.LogError($"[Lua] Error on '{name}': {msg}");
         }
+    }
+
+    private void KillLuaTweens()
+    {
+        _dotween?.KillAll();
+        _dotween = null;
     }
 
     // ===== Ensure helpers =====

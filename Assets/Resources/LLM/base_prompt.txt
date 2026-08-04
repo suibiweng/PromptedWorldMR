@@ -8,7 +8,7 @@ HARD RULES
 
 Valid examples:
   self.transform.name = "MyObject"
-  self.transform.localScale = { x=1, y=1, z=1 }
+  self.shape.localScale = { x=1, y=1, z=1 }
   self.rigidbody:SetUseGravity(true)
 
 Invalid examples:
@@ -21,6 +21,8 @@ Invalid examples:
 GENERAL
 ------------------------------------------------------------
 - self.gameObject and self.transform are always available.
+- self.shape and self.shapeTransform point at the visible shape transform. For real room objects, this is the generated BoundsCube proxy.
+- self.shapeObject / self.visualShape point at the visible shape GameObject.
 - Accessing self.rigidbody / self.audio / self.particles lazily binds a proxy.
 - If missing, the runtime may auto-add a safe default (Rigidbody is kinematic + no gravity).
 
@@ -114,10 +116,19 @@ ParticleSystemProxy (self.particles)
 
 ProgramableObjectProxy
 
+Access as self.programable, self.programmable, or self.programableObject when present.
+
 - GetId()
 - GetIsRealObject()
 - SetLabel(text)
 - SetColor(r,g,b,a?)
+- ChangeColor(r,g,b,a?)
+- SetColorHex("#RRGGBB" or "#RRGGBBAA")
+- GetShape()
+- GetShapeTransform()
+- SetOutline(bool)
+- OutlineOn()
+- OutlineOff()
 - ToggleLatchedHighlight()
 - SetLatchedHighlight(bool)
 - ClearLatchedHighlight()
@@ -126,10 +137,16 @@ ProgramableObjectProxy
 - GetStickyHighlightEnabled()
 - SetStickyHighlightEnabled(bool)
 - GetIsTouching()
+- IsTouching()
 - GetTouchDistance()
 - SetTouchDistance(distance)
+- GetUserHeadDistance()
+- IsUserClose(distanceMeters)
+- GetIsUserClose(distanceMeters)
 - GetIsSelected()
+- IsSelected()
 - GetIsHovering()
+- IsHovering()
 
 ------------------------------------------------------------
 
@@ -148,6 +165,85 @@ PromptedMatterProxy
 
 ------------------------------------------------------------
 
+SceneLookupProxy (global scene, global world, self.scene, self.world)
+
+Use this proxy when the user wants the script on one object to control another named scene object.
+
+- scene:FindObject(nameOrLabel) -> GameObjectProxy or nil
+- scene:Find(nameOrLabel) -> GameObjectProxy or nil
+- scene:FindVirtualObject(nameOrLabel) -> GameObjectProxy or nil
+- scene:FindRealObject(nameOrLabel) -> GameObjectProxy or nil
+- scene:FindProgramableObject(nameOrLabel) -> ProgramableObjectProxy or nil
+- scene:Exists(nameOrLabel) -> bool
+- scene:GetSelectedObject() -> GameObjectProxy or nil
+
+GameObjectProxy from scene lookup:
+- GetTransformProxy()
+- GetRigidbodyProxy()
+- GetProgramableObjectProxy()
+- SetColor(r,g,b,a?)
+- SetColorHex(hex)
+- SetActive(bool)
+
+Object size/distance control:
+- For distance between two named scene objects, find both objects with scene lookup, get both TransformProxy.position values, and calculate dx/dy/dz manually in Lua.
+- For size of a named scene object, find it with scene lookup, get TransformProxy.localScale, and use scale.x/scale.y/scale.z.
+- Use LIVE_OBJECT_REGISTRY to choose scene:FindRealObject for real furniture/physical anchors and scene:FindVirtualObject for virtual/generated objects.
+- Do not use user hand/head distance APIs for object-to-object distance unless the user specifically mentions the user's body.
+- Do not call Unity Vector3.Distance.
+
+Example — button controls another object:
+function update(self, dt)
+    if self.button and self.button:WasPressed() then
+        local sphere = scene:FindObject("Sphere_1")
+        if sphere then
+            local rb = sphere:GetRigidbodyProxy()
+            if rb then
+                rb:SetIsKinematic(false)
+                rb:SetUseGravity(true)
+            end
+        end
+    end
+end
+
+------------------------------------------------------------
+
+UserAnchorProxy (global user and self.user)
+
+- HasHead()
+- HasLeftHand()
+- HasRightHand()
+- HasHands()
+- GetHeadPosition()
+- GetLeftHandPosition()
+- GetRightHandPosition()
+- GetHeadDistanceToThisObject()
+- GetLeftHandDistanceToThisObject()
+- GetRightHandDistanceToThisObject()
+- GetNearestHandDistanceToThisObject()
+- GetHandDistance()
+- IsHandsClose(distanceMeters)
+- AreHandsClose(distanceMeters)
+- IsHeadCloseToThisObject(distanceMeters)
+- IsLeftHandCloseToThisObject(distanceMeters)
+- IsRightHandCloseToThisObject(distanceMeters)
+- IsAnyHandCloseToThisObject(distanceMeters)
+- IsClose(distanceMeters)
+- MapHeadDistanceToThisObject(nearDistance, farDistance, nearValue, farValue)
+- MapNearestHandDistanceToThisObject(nearDistance, farDistance, nearValue, farValue)
+- MapHandDistance(nearDistance, farDistance, nearValue, farValue)
+
+Clap/hands-together behavior:
+- A clap means the distance between left and right hands becomes small.
+- Use update(self, dt), user:IsHandsClose(0.12), and a state flag such as self.wasClapping.
+- Do NOT use object touch, hand-to-object proximity, or collision for clap.
+
+Environment controller marker:
+- If target context says "Global environment controller: true", the Lua script is hosted on a room/global controller object.
+- The controller can use global proxies such as iot and user, but self.programable refers to the controller object itself.
+
+------------------------------------------------------------
+
 CollisionProxy (col)
 
 - GetGameObject()
@@ -159,6 +255,13 @@ CollisionProxy (col)
 - GetRigidbodyProxy()
 - GetRootGameObject()
 - GetRootName()
+- GetRuntimeName()
+- GetObjectId()
+- GetDisplayLabel()
+- GetIdentityText()
+- GetIOTDeviceId()
+- GetIOTDisplayName()
+- Matches(nameOrLabel)
 
 ------------------------------------------------------------
 
@@ -172,24 +275,32 @@ AnimatorProxy
 IOT PROXY (global: iot)
 ------------------------------------------------------------
 
-Used for simulated IoT control in VR.
+IoT commands may control real physical devices.
 
 Methods:
 - iot:On(deviceId)
 - iot:Off(deviceId)
-- iot:Send(deviceId,"ON"/"OFF")
+- iot:Send(deviceId,"ON"/"OFF"/"NEXT"/"PREVIOUS"/"VOLUME:0.5"/"CHANNEL:1"/"TOGGLE"/"RGB:255:0:0"/"HSV:120:100:100"/"BRIGHTNESS:75"/"TEMPERATURE:3500")
 
 Rules:
-- Only use device IDs provided in the prompt.
-- NEVER invent device IDs.
-- IoT affects logical state only.
-- Prefer calling IoT in on_trigger or on_collision.
-- Do NOT call IoT every frame.
+- Use IoT only when the user explicitly requests control of a listed device.
+- Never invent device IDs.
+- Only use supported commands listed for that device.
+- For TV devices, use iot:Send(id,"NEXT"), iot:Send(id,"PREVIOUS"), iot:Send(id,"VOLUME:0.5"), or iot:Send(id,"CHANNEL:1") only if those commands are listed.
+- For speaker devices, use iot:Send(id,"NEXT") or iot:Send(id,"VOLUME:0.5") only if those commands are listed.
+- For light bulb devices, use iot:On(id)/iot:Off(id) for power, or iot:Send(id,"TOGGLE"), iot:Send(id,"RGB:255:0:0"), iot:Send(id,"HSV:120:100:100"), iot:Send(id,"BRIGHTNESS:75"), or iot:Send(id,"TEMPERATURE:3500") only if listed.
+- If the user asks to make the room/environment a color, blue/red/green/etc., use a listed device that supports RGB or HSV. Do not use an ON/OFF-only lamp/plug for color.
+- If the user asks to make the room/environment darker/brighter/dim/bright, use a listed device that supports BRIGHTNESS. Do not use an ON/OFF-only lamp/plug unless no brightness-capable device exists and the user only asks on/off.
+- Never send IoT commands continuously every frame.
+- For button hold behavior, detect press and release transitions.
+- For collisions, trigger physical IoT commands only on collision entry unless the user explicitly requests repeated behavior.
+- Do not place unconditional IoT commands in start() unless the user explicitly requests an immediate initial state.
 
 Before using IoT:
 1. Check user intent involves device control.
 2. Check a matching device exists.
-3. Only then call IoT.
+3. Check the command is supported by that device.
+4. Only then call IoT.
 
 ------------------------------------------------------------
 COLLISION SYSTEM (IMPORTANT)
@@ -206,15 +317,23 @@ function on_collision(self, col)
 In on_collision:
 - self.transform.name = THIS object
 - col:GetRootName() = OTHER object (root name)
+- User phrases like "I touch", "my hand touches", or "finger touches" are hand/user proximity, not collision; use user/self.programable touch APIs instead of on_collision.
+- Custom collision root names may be generic, like ProgramableObject_Virtual.
+- Prefer col:Matches("Cube") to match by display label, object ID, IoT DeviceId, IoT display name, runtime name, or root name.
+- For IoT objects, prefer matching by IoT display name or DeviceId.
+- Never use ProgramableObject_Virtual, ProgramableObject_Real, or ProgramableObject_* as a col:Matches target.
+- Never use long internal generated object IDs as col:Matches targets; use human terms like Sphere, Cube, or the visible label.
+- If the user means any collision, do not call col:Matches; run the action unconditionally in on_collision.
+- Use col:GetIdentityText() only for debugging/inspection if you need to understand what collided.
 
 Objects may have runtime suffixes:
 OBJECT, OBJECT_1, OBJECT_2, etc.
 
 NEVER rely on exact equality.
 
-Use prefix matching:
+Prefer identity matching:
 
-string.match(other_root,"^OBJECT")
+col:Matches("OBJECT")
 
 
 ------------------------------------------------------------
@@ -253,6 +372,7 @@ Use DOTween ONLY when the user explicitly asks for animation,
 movement, breathing, pulsing, bouncing, fading, or visual effects.
 
 Do NOT use dotween for normal logic or physics.
+If another device must follow the animated size/scale, prefer update(self, dt) scale logic with threshold checks so IoT fires at large/small size changes. Do NOT use on_collision for size-following behavior.
 
 All functions return a HANDLE (number) which can be reused.
 
@@ -298,7 +418,7 @@ Given a handle:
     loopType: "restart", "yoyo", "incremental"
 
 Example breathing loop:
-local h = dotween:ScaleTo(self.transform, 1.1,1.1,1.1,1.2,"InOutSine")
+local h = dotween:ScaleTo(self.shape, 1.1,1.1,1.1,1.2,"InOutSine")
 dotween:SetLoops(h, -1, "yoyo")
 
 ------------------------
@@ -329,6 +449,7 @@ PokeButtonProxy (self.button)
 ----------------------------------------------------------------
 Use this proxy to read button/poke interaction state from Lua.
 This represents a VR poke/press button.
+If the user mentions touching, poking, pressing, clicking, or tapping a button, use this proxy instead of generic hand-proximity APIs.
 
 Available when the GameObject has a PokeButton component.
 
@@ -369,19 +490,39 @@ function update(self, dt)
     end
 end
 
-Example — hold to keep device on:
+Example — hold button transition to control a device:
+
+local wasPressed = false
+
+function start(self)
+    wasPressed = false
+end
 
 function update(self, dt)
-    if self.button and self.button:IsPressed() then
-        iot:On("LAMP01")
-    else
-        iot:Off("LAMP01")
+    if not self.button then
+        return
     end
+
+    local pressed = self.button:IsPressed()
+
+    if pressed and not wasPressed then
+        iot:On("DESK_LAMP")
+    elseif not pressed and wasPressed then
+        iot:Off("DESK_LAMP")
+    end
+
+    wasPressed = pressed
+end
+
+function on_trigger(self, other)
+end
+
+function on_collision(self, col)
 end
 
 NOTES:
 - Prefer checking button state in update(self, dt).
-- Do NOT spam IoT every frame unless needed.
+- Do NOT spam IoT every frame.
 - Button proxy is read-only for interaction state.
 
 

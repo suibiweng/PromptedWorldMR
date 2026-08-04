@@ -40,6 +40,20 @@ public class ProgramableObject : MonoBehaviour
     public GameObject shape;
     public Transform shapeRoot;
 
+    [Header("Lua State Indicator")]
+    [Tooltip("Assign a UI Image or RawImage. Alpha 0 = no Lua assigned, red = stopped, green = playing.")]
+    public Graphic LuaStateIndicator;
+    public Color luaNoScriptColor = new Color(1f, 1f, 1f, 0f);
+    public Color luaStoppedColor = new Color(1f, 0f, 0f, 1f);
+    public Color luaPlayingColor = new Color(0f, 1f, 0f, 1f);
+
+    [Header("Billboard Label")]
+    public bool labelFacesCamera = true;
+    [Tooltip("Enable if your label still appears backward after billboarding.")]
+    public bool invertLabelFacing = false;
+    [Tooltip("Optional override. If empty, uses the TextBox parent/2DDisplay transform.")]
+    public Transform labelBillboardRoot;
+
     [Tooltip("Outline component used for selection highlight.")]
     public Outline selectOutline;
 
@@ -56,8 +70,14 @@ public class ProgramableObject : MonoBehaviour
     [Tooltip("If true, selection is sticky: click toggles it on/off (latched).")]
     public bool stickyHighlightEnabled = true;
 
+    [Header("Outline Colors")]
+    [SerializeField] private Color virtualOutlineColor = Color.red;
+    [SerializeField] private Color realOutlineColor = Color.cyan;
+    [HideInInspector] public bool alwaysShowRealObjectOutline = false;
+
     [Header("User Anchors & Proximity")]
     public Transform userRoot;
+    public Transform userHead;
     public Transform userLeftHand;
     public Transform userRightHand;
     [Range(0.01f, 0.5f)] public float Touchingdistance = 0.1f;
@@ -99,6 +119,10 @@ public class ProgramableObject : MonoBehaviour
 
         _view = _interactableViewObj as IInteractableView;
 
+        if (userHead == null && promptedWorldManager != null)
+            userHead = promptedWorldManager.userHead;
+        if (userRoot == null)
+            userRoot = userHead;
         if (userLeftHand == null && promptedWorldManager != null)
             userLeftHand = promptedWorldManager.userLeftHand;
         if (userRightHand == null && promptedWorldManager != null)
@@ -107,7 +131,10 @@ public class ProgramableObject : MonoBehaviour
         if (shape != null && selectOutline == null)
             selectOutline = shape.GetComponentInChildren<Outline>(includeInactive: true);
 
+        ApplyRealObjectInteractionPolicy();
+        ApplyOutlineColor();
         SetOutline(false);
+        UpdateLuaStateIndicator();
         highlightLatched = false;
     }
 
@@ -135,11 +162,134 @@ public class ProgramableObject : MonoBehaviour
     void Update()
     {
         ProximityTouchingDetection();
+        UpdateLuaStateIndicator();
+        UpdateLabelBillboard();
+    }
+
+    void OnValidate()
+    {
+        UpdateLuaStateIndicator();
     }
 
     // ---------- Public helpers ----------
 
     public bool hasLuaScript() => GetComponent<LuaBehaviour>() != null;
+
+    private void UpdateLabelBillboard()
+    {
+        if (!labelFacesCamera)
+            return;
+
+        Transform labelTransform = GetLabelBillboardTransform();
+        if (labelTransform == null)
+            return;
+
+        Transform cameraTransform = GetBillboardCameraTransform();
+        if (cameraTransform == null)
+            return;
+
+        Vector3 direction = labelTransform.position - cameraTransform.position;
+        if (direction.sqrMagnitude < 0.0001f)
+            return;
+
+        if (invertLabelFacing)
+            direction = -direction;
+
+        labelTransform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
+    }
+
+    private Transform GetLabelBillboardTransform()
+    {
+        if (labelBillboardRoot != null)
+            return labelBillboardRoot;
+
+        if (TextBox == null)
+            return null;
+
+        Transform current = TextBox.transform;
+        while (current.parent != null && current.parent != transform)
+        {
+            if (current.name.IndexOf("2DDisplay", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                current.name.IndexOf("Display", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return current;
+            }
+
+            current = current.parent;
+        }
+
+        return TextBox.transform.parent != null ? TextBox.transform.parent : TextBox.transform;
+    }
+
+    private Transform GetBillboardCameraTransform()
+    {
+        if (userHead != null)
+            return userHead;
+
+        if (promptedWorldManager != null && promptedWorldManager.userHead != null)
+            return promptedWorldManager.userHead;
+
+        Camera mainCamera = Camera.main;
+        return mainCamera != null ? mainCamera.transform : null;
+    }
+
+    public void UpdateLuaStateIndicator()
+    {
+        if (LuaStateIndicator == null)
+            return;
+
+        var lua = GetComponent<LuaBehaviour>();
+        if (lua == null || !LuaHasAssignedScript(lua))
+        {
+            LuaStateIndicator.color = luaNoScriptColor;
+            return;
+        }
+
+        LuaStateIndicator.color = lua.runEnabled ? luaPlayingColor : luaStoppedColor;
+    }
+
+    private static bool LuaHasAssignedScript(LuaBehaviour lua)
+    {
+        if (lua == null)
+            return false;
+
+        return !string.IsNullOrWhiteSpace(lua.CurrentLua) ||
+               !string.IsNullOrWhiteSpace(lua.inlineScript) ||
+               lua.scriptAsset != null;
+    }
+
+    public GameObject GetLuaShapeObject()
+    {
+        if (ShapeRenderer != null)
+            return ShapeRenderer.gameObject;
+
+        Transform boundsCube = transform.Find("BoundsCube");
+        if (boundsCube != null)
+            return boundsCube.gameObject;
+
+        if (shape != null)
+        {
+            var renderer = shape.GetComponentInChildren<Renderer>(includeInactive: true);
+            if (renderer != null)
+                return renderer.gameObject;
+
+            return shape;
+        }
+
+        return gameObject;
+    }
+
+    public Transform GetLuaShapeTransform()
+    {
+        var shapeObject = GetLuaShapeObject();
+        return shapeObject != null ? shapeObject.transform : transform;
+    }
+
+    public void SetOutlineVisible(bool on)
+    {
+        ApplyOutlineColor();
+        SetOutline(on);
+    }
 
     public void setShape(GameObject obj)
     {
@@ -155,7 +305,54 @@ public class ProgramableObject : MonoBehaviour
         if (selectOutline == null)
             selectOutline = shape.GetComponentInChildren<Outline>(includeInactive: true);
 
+        ApplyRealObjectInteractionPolicy();
+        ApplyOutlineColor();
         UpdateHighlightVisual();
+    }
+
+    public void ApplyRealObjectInteractionPolicy()
+    {
+        if (!isRealObject)
+            return;
+
+        DisableGrabComponents();
+
+        var body = GetComponent<Rigidbody>();
+        if (body != null)
+        {
+            body.isKinematic = true;
+            body.useGravity = false;
+        }
+    }
+
+    private void DisableGrabComponents()
+    {
+        foreach (var component in GetComponentsInChildren<MonoBehaviour>(includeInactive: true))
+        {
+            if (component == null || component == this)
+                continue;
+
+            string typeName = component.GetType().Name;
+            string fullName = component.GetType().FullName ?? typeName;
+
+            if (typeName.IndexOf("Grab", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                fullName.IndexOf(".Grab", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                component.enabled = false;
+            }
+        }
+
+        foreach (Transform child in GetComponentsInChildren<Transform>(includeInactive: true))
+        {
+            if (child == null || child == transform)
+                continue;
+
+            if (child.name.IndexOf("HandGrab", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                child.name.IndexOf("DistanceHandGrab", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                child.gameObject.SetActive(false);
+            }
+        }
     }
 
     // These are used by LassoSelectorMR3D (and handy for code)
@@ -215,6 +412,8 @@ public class ProgramableObject : MonoBehaviour
     // Decide whether outline should be visible
     private void UpdateHighlightVisual()
     {
+        ApplyOutlineColor();
+
         bool show =
             (stickyHighlightEnabled && highlightLatched) ||
             (!stickyHighlightEnabled && _selected) ||
@@ -225,8 +424,62 @@ public class ProgramableObject : MonoBehaviour
 
     private void SetOutline(bool on)
     {
+        bool shouldShow = on || (isRealObject && alwaysShowRealObjectOutline);
+
+        if (isRealObject && shape != null)
+        {
+            foreach (var outline in shape.GetComponentsInChildren<Outline>(includeInactive: true))
+            {
+                if (outline == null)
+                    continue;
+
+                outline.OutlineColor = realOutlineColor;
+                outline.enabled = shouldShow;
+            }
+
+            if (selectOutline != null)
+            {
+                selectOutline.OutlineColor = realOutlineColor;
+                selectOutline.enabled = shouldShow;
+            }
+
+            ApplyBoundsWireOutline(shouldShow, realOutlineColor);
+            return;
+        }
+
         if (selectOutline != null)
-            selectOutline.enabled = on;
+            selectOutline.enabled = shouldShow;
+
+        if (isRealObject)
+            ApplyBoundsWireOutline(shouldShow, realOutlineColor);
+    }
+
+    private void ApplyOutlineColor()
+    {
+        if (selectOutline == null)
+            return;
+
+        selectOutline.OutlineColor = isRealObject ? realOutlineColor : virtualOutlineColor;
+    }
+
+    private void ApplyBoundsWireOutline(bool on, Color color)
+    {
+        Transform boundsCube = transform.Find("BoundsCube");
+        if (boundsCube == null)
+            return;
+
+        var lines = boundsCube.GetComponentsInChildren<LineRenderer>(includeInactive: true);
+        foreach (var line in lines)
+        {
+            if (line == null)
+                continue;
+
+            line.startColor = color;
+            line.endColor = color;
+            if (line.sharedMaterial != null && line.sharedMaterial.HasProperty("_Color"))
+                line.sharedMaterial.SetColor("_Color", Color.white);
+            line.enabled = on;
+        }
     }
 
     // ========== OVERRIDABLE HOOKS ==========
@@ -243,16 +496,13 @@ public class ProgramableObject : MonoBehaviour
 
     protected virtual void OnSelectEnter()
     {
-        // MULTI-SELECT: toggle this object in the manager’s dynamic list
+        // Click/ray selection is single-select. Lasso keeps its own multi-select path.
         if (promptedWorldManager != null)
         {
-            promptedWorldManager.ToggleSelection(this.gameObject);
-            // Sync latched highlight to manager’s selection state
-            highlightLatched = promptedWorldManager.IsSelected(this.gameObject);
+            highlightLatched = promptedWorldManager.TogglePrimarySelection(this.gameObject);
         }
         else
         {
-            // Fallback: local toggle
             highlightLatched = !highlightLatched;
         }
 
@@ -354,8 +604,29 @@ public class ProgramableObject : MonoBehaviour
         _prevTouching = isToching;
     }
 
+    public float GetUserHeadDistance()
+    {
+        Transform anchor = userHead != null ? userHead : userRoot;
+        return anchor != null
+            ? Vector3.Distance(anchor.position, transform.position)
+            : float.PositiveInfinity;
+    }
+
+    public bool IsUserClose(float distance)
+    {
+        return GetUserHeadDistance() <= Mathf.Max(0.001f, distance);
+    }
+
     public void changeColor(Color color)
     {
+        if (isRealObject)
+        {
+            realOutlineColor = color;
+            ApplyOutlineColor();
+            SetOutline(highlightLatched || _selected || _hovering);
+            return;
+        }
+
         if (ShapeRenderer != null)
         {
             ShapeRenderer.material.color = color;

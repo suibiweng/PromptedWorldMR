@@ -53,16 +53,39 @@ public class SimpleCollidable : MonoBehaviour
     // =========================
     void OnCustomCollisionEnter(GameObject other)
     {
-        Debug.Log($"{name} ENTER {other.name}");
+        Debug.Log($"{GetDebugName(gameObject)} ENTER {GetDebugName(other)}");
     }
 
     void OnCustomCollisionStay(GameObject other)
     {
-        Debug.Log($"{name} STAY {other.name}");
+        Debug.Log($"{GetDebugName(gameObject)} STAY {GetDebugName(other)}");
     }
 
     void OnCustomCollisionExit(GameObject other)
     {
-        Debug.Log($"{name} EXIT {other.name}");
+        Debug.Log($"{GetDebugName(gameObject)} EXIT {GetDebugName(other)}");
+    }
+
+    string GetDebugName(GameObject go)
+    {
+        if (go == null)
+            return "(null)";
+
+        var po = go.GetComponentInParent<ProgramableObject>();
+        if (po != null)
+        {
+            string label = po.TextBox != null ? po.TextBox.text : "";
+            if (!string.IsNullOrWhiteSpace(label))
+                return $"{label.Trim()} [{go.name}]";
+
+            if (!string.IsNullOrWhiteSpace(po.id))
+                return $"{po.id} [{go.name}]";
+        }
+
+        var iot = go.GetComponentInParent<IOTobject>();
+        if (iot != null)
+            return $"{iot.DisplayName} ({iot.DeviceId}) [{go.name}]";
+
+        return go.name;
     }
 }

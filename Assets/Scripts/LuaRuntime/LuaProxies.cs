@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using MoonSharp.Interpreter;
 using System;
+using System.Collections.Generic;
 
 namespace LuaProxies
 {
@@ -243,6 +244,7 @@ namespace LuaProxies
         public string GetTag() => _gameObject.tag;
         public bool IsActive() => _gameObject.activeSelf;
         public void SetActive(bool active) => _gameObject.SetActive(active);
+        public TransformProxy transform => GetTransformProxy();
 
         public TransformProxy GetTransformProxy() =>
             (_gameObject != null && _gameObject.transform != null)
@@ -299,6 +301,244 @@ namespace LuaProxies
             for (int i = 0; i < systems.Length; i++)
                 proxies[i] = new ParticleSystemProxy(systems[i]);
             return proxies;
+        }
+
+        public ProgramableObjectProxy GetProgramableObjectProxy()
+        {
+            if (_gameObject == null) return null;
+            var po = _gameObject.GetComponentInParent<ProgramableObject>();
+            return po != null ? new ProgramableObjectProxy(po) : null;
+        }
+
+        public ProgramableObjectProxy GetProgrammableObjectProxy() => GetProgramableObjectProxy();
+
+        public void SetColor(float r, float g, float b, float a = 1f)
+        {
+            var po = GetProgramableObjectProxy();
+            if (po != null) po.SetColor(r, g, b, a);
+        }
+
+        public void SetColorHex(string hex)
+        {
+            var po = GetProgramableObjectProxy();
+            if (po != null) po.SetColorHex(hex);
+        }
+    }
+
+    // ------------------------------------------------------------
+    // SceneLookupProxy
+    // ------------------------------------------------------------
+    [MoonSharpUserData]
+    public class SceneLookupProxy
+    {
+        private readonly global::PromptedWorldManager _manager;
+        private readonly Transform _host;
+
+        public SceneLookupProxy(global::PromptedWorldManager manager, Transform host)
+        {
+            _manager = manager;
+            _host = host;
+        }
+
+        public GameObjectProxy FindObject(string reference) => Find(reference);
+
+        public GameObjectProxy Find(string reference)
+        {
+            var go = ResolveGameObject(reference);
+            return go != null ? new GameObjectProxy(go) : null;
+        }
+
+        public ProgramableObjectProxy FindProgramableObject(string reference)
+        {
+            var po = ResolveProgramableObject(reference);
+            return po != null ? new ProgramableObjectProxy(po) : null;
+        }
+
+        public ProgramableObjectProxy FindProgrammableObject(string reference) => FindProgramableObject(reference);
+
+        public GameObjectProxy FindVirtualObject(string reference)
+        {
+            var po = ResolveProgramableObject(reference, realFilter: false);
+            return po != null ? new GameObjectProxy(po.gameObject) : null;
+        }
+
+        public GameObjectProxy FindRealObject(string reference)
+        {
+            var po = ResolveProgramableObject(reference, realFilter: true);
+            return po != null ? new GameObjectProxy(po.gameObject) : null;
+        }
+
+        public bool Exists(string reference) => ResolveGameObject(reference) != null;
+
+        public GameObjectProxy GetSelectedObject()
+        {
+            var selected = _manager != null ? _manager.selectedObject : null;
+            return selected != null ? new GameObjectProxy(selected) : null;
+        }
+
+        private GameObject ResolveGameObject(string reference)
+        {
+            var po = ResolveProgramableObject(reference);
+            if (po != null)
+                return po.gameObject;
+
+            var iot = ResolveIOTObject(reference);
+            if (iot != null)
+                return iot.gameObject;
+
+            return null;
+        }
+
+        private ProgramableObject ResolveProgramableObject(string reference, bool? realFilter = null)
+        {
+            if (string.IsNullOrWhiteSpace(reference))
+                return null;
+
+            var candidates = CollectProgramableObjects(realFilter);
+            ProgramableObject exact = null;
+            ProgramableObject partial = null;
+            bool partialAmbiguous = false;
+
+            foreach (var po in candidates)
+            {
+                if (po == null)
+                    continue;
+
+                if (MatchesProgramableObject(po, reference, exactOnly: true))
+                {
+                    if (exact != null && exact != po)
+                        return null;
+                    exact = po;
+                }
+                else if (MatchesProgramableObject(po, reference, exactOnly: false))
+                {
+                    if (partial != null && partial != po)
+                        partialAmbiguous = true;
+                    partial = po;
+                }
+            }
+
+            if (exact != null)
+                return exact;
+
+            return partialAmbiguous ? null : partial;
+        }
+
+        private List<ProgramableObject> CollectProgramableObjects(bool? realFilter)
+        {
+            var list = new List<ProgramableObject>();
+            void Add(ProgramableObject po)
+            {
+                if (po == null || list.Contains(po))
+                    return;
+                if (realFilter.HasValue && po.isRealObject != realFilter.Value)
+                    return;
+                list.Add(po);
+            }
+
+            if (_manager != null)
+            {
+                foreach (var po in _manager.VirtualObjects)
+                    Add(po);
+                foreach (var po in _manager.RealObjects)
+                    Add(po);
+            }
+
+            foreach (var po in UnityEngine.Object.FindObjectsByType<ProgramableObject>(
+                         FindObjectsInactive.Include,
+                         FindObjectsSortMode.None))
+            {
+                Add(po);
+            }
+
+            return list;
+        }
+
+        private IOTobject ResolveIOTObject(string reference)
+        {
+            if (string.IsNullOrWhiteSpace(reference))
+                return null;
+
+            IOTobject exact = null;
+            IOTobject partial = null;
+            bool partialAmbiguous = false;
+
+            foreach (var iot in UnityEngine.Object.FindObjectsByType<IOTobject>(
+                         FindObjectsInactive.Include,
+                         FindObjectsSortMode.None))
+            {
+                if (iot == null)
+                    continue;
+
+                if (MatchesAny(reference, exactOnly: true, iot.DeviceId, iot.DisplayName, iot.gameObject.name))
+                {
+                    if (exact != null && exact != iot)
+                        return null;
+                    exact = iot;
+                }
+                else if (MatchesAny(reference, exactOnly: false, iot.DeviceId, iot.DisplayName, iot.gameObject.name))
+                {
+                    if (partial != null && partial != iot)
+                        partialAmbiguous = true;
+                    partial = iot;
+                }
+            }
+
+            if (exact != null)
+                return exact;
+
+            return partialAmbiguous ? null : partial;
+        }
+
+        private bool MatchesProgramableObject(ProgramableObject po, string reference, bool exactOnly)
+        {
+            string label = po.TextBox != null ? po.TextBox.text : "";
+            string shapeName = po.shape != null ? po.shape.name : "";
+            var iot = po.GetComponentInParent<IOTobject>();
+
+            return MatchesAny(
+                reference,
+                exactOnly,
+                po.id,
+                po.gameObject.name,
+                label,
+                shapeName,
+                iot != null ? iot.DeviceId : "",
+                iot != null ? iot.DisplayName : ""
+            );
+        }
+
+        private bool MatchesAny(string reference, bool exactOnly, params string[] terms)
+        {
+            string needle = NormalizeLookup(reference);
+            if (string.IsNullOrEmpty(needle))
+                return false;
+
+            foreach (var term in terms)
+            {
+                string haystack = NormalizeLookup(term);
+                if (string.IsNullOrEmpty(haystack))
+                    continue;
+
+                if (haystack == needle)
+                    return true;
+
+                if (!exactOnly && (haystack.Contains(needle) || needle.Contains(haystack)))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private string NormalizeLookup(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return "";
+
+            return value.Trim()
+                .Replace(' ', '_')
+                .Replace("-", "_")
+                .ToUpperInvariant();
         }
     }
 
@@ -368,23 +608,41 @@ public class RigidbodyProxy
     public void SetVelocity(Vector3 v)
     {
         EnsureDynamicIfPhysics();
-        _rb.linearVelocity = v;
+        SetRbVelocity(v);
     }
 
     public void SetVelocity(float x, float y, float z)
     {
         EnsureDynamicIfPhysics();
-        _rb.linearVelocity = new Vector3(x, y, z);
+        SetRbVelocity(new Vector3(x, y, z));
     }
 
     public Vector3Proxy GetVelocity()
     {
-        return new Vector3Proxy(_rb.linearVelocity);
+        return new Vector3Proxy(GetRbVelocity());
     }
 
     // -------- Mass --------
     public float GetMass() => _rb.mass;
     public void SetMass(float m) => _rb.mass = m;
+
+    private Vector3 GetRbVelocity()
+    {
+#if UNITY_6000_0_OR_NEWER
+        return _rb.linearVelocity;
+#else
+        return _rb.velocity;
+#endif
+    }
+
+    private void SetRbVelocity(Vector3 v)
+    {
+#if UNITY_6000_0_OR_NEWER
+        _rb.linearVelocity = v;
+#else
+        _rb.velocity = v;
+#endif
+    }
 }
 
 
@@ -545,25 +803,58 @@ public class CollisionProxy
             if (_po != null) _po.changeColor(new UnityEngine.Color(r, g, b, a));
         }
 
+        public void ChangeColor(float r, float g, float b, float a = 1f) => SetColor(r, g, b, a);
+
+        public void SetColorHex(string hex)
+        {
+            if (_po == null || string.IsNullOrWhiteSpace(hex)) return;
+            if (!hex.StartsWith("#", StringComparison.Ordinal)) hex = "#" + hex;
+            if (ColorUtility.TryParseHtmlString(hex, out var color)) _po.changeColor(color);
+        }
+
+        public GameObjectProxy GetShape()
+        {
+            var shapeObject = _po != null ? _po.GetLuaShapeObject() : null;
+            return shapeObject != null ? new GameObjectProxy(shapeObject) : null;
+        }
+
+        public TransformProxy GetShapeTransform()
+        {
+            var shapeTransform = _po != null ? _po.GetLuaShapeTransform() : null;
+            return shapeTransform != null ? new TransformProxy(shapeTransform) : null;
+        }
+
+        public void SetOutline(bool on)
+        {
+            if (_po != null) _po.SetOutlineVisible(on);
+        }
+
+        public void OutlineOn() => SetOutline(true);
+        public void OutlineOff() => SetOutline(false);
+
         // ---- Highlight controls (sticky latch) ----
         public void ToggleLatchedHighlight()
         {
-          //  if (_po != null) _po.ToggleLatchedHighlight();
+            if (_po == null) return;
+            _po.SetLatchedHighlight(!_po.highlightLatched);
         }
 
         public void SetLatchedHighlight(bool on)
         {
-            //if (_po != null) _po.SetLatchedHighlight(on);
+            if (_po == null) return;
+            _po.SetLatchedHighlight(on);
         }
 
         public void ClearLatchedHighlight()
         {
-            //if (_po != null) _po.ClearLatchedHighlight();
+            if (_po == null) return;
+            _po.ClearLatchedHighlight();
         }
 
         public void RefreshHighlight()
         {
-           // if (_po != null) _po.SetLatchedHighlight(_po.highlightLatched);
+            if (_po == null) return;
+            _po.SetLatchedHighlight(_po.highlightLatched);
         }
 
         public bool GetHighlightOnHover() => _po != null && _po.highlightOnHover;
@@ -571,7 +862,7 @@ public class CollisionProxy
         {
             if (_po == null) return;
             _po.highlightOnHover = enable;
-          //  _po.SetLatchedHighlight(_po.highlightLatched);
+            _po.SetLatchedHighlight(_po.highlightLatched);
         }
 
         public bool GetStickyHighlightEnabled() => _po != null && _po.stickyHighlightEnabled;
@@ -579,11 +870,11 @@ public class CollisionProxy
         {
             if (_po == null) return;
             _po.stickyHighlightEnabled = enable;
-            _po.stickyHighlightEnabled = enable;
-           // _po.SetLatchedHighlight(_po.highlightLatched);
+            _po.SetLatchedHighlight(_po.highlightLatched);
         }
 
         public bool GetIsTouching() => _po != null && _po.isToching;
+        public bool IsTouching() => GetIsTouching();
         public float GetTouchDistance() => _po != null ? _po.Touchingdistance : 0f;
         public void SetTouchDistance(float d)
         {
@@ -591,12 +882,143 @@ public class CollisionProxy
             _po.Touchingdistance = Mathf.Max(0.001f, d);
         }
 
+        public float GetUserHeadDistance() => _po != null ? _po.GetUserHeadDistance() : float.PositiveInfinity;
+        public bool IsUserClose(float distance = 1f) => _po != null && _po.IsUserClose(distance);
+        public bool GetIsUserClose(float distance = 1f) => IsUserClose(distance);
+
         public bool GetIsSelected() => _po != null && _po._selected;
+        public bool IsSelected() => GetIsSelected();
         public bool GetIsHovering() => _po != null && _po._hovering;
+        public bool IsHovering() => GetIsHovering();
 
         public void SetImage(Texture tex)
         {
             if (_po != null) _po.setImage(tex);
+        }
+    }
+
+    [MoonSharpUserData]
+    public class UserAnchorProxy
+    {
+        private readonly global::PromptedWorldManager _manager;
+        private readonly Transform _target;
+
+        public UserAnchorProxy(global::PromptedWorldManager manager, Transform target)
+        {
+            _manager = manager;
+            _target = target;
+        }
+
+        public bool HasHead() => _manager != null && _manager.userHead != null;
+        public bool HasLeftHand() => _manager != null && _manager.userLeftHand != null;
+        public bool HasRightHand() => _manager != null && _manager.userRightHand != null;
+        public bool HasHands() => HasLeftHand() && HasRightHand();
+
+        public Vector3Proxy GetHeadPosition()
+        {
+            return HasHead()
+                ? new Vector3Proxy(_manager.userHead.position)
+                : new Vector3Proxy(Vector3.zero);
+        }
+
+        public Vector3Proxy GetLeftHandPosition()
+        {
+            return HasLeftHand()
+                ? new Vector3Proxy(_manager.userLeftHand.position)
+                : new Vector3Proxy(Vector3.zero);
+        }
+
+        public Vector3Proxy GetRightHandPosition()
+        {
+            return HasRightHand()
+                ? new Vector3Proxy(_manager.userRightHand.position)
+                : new Vector3Proxy(Vector3.zero);
+        }
+
+        public float GetHeadDistanceToThisObject()
+        {
+            return HasHead() && _target != null
+                ? Vector3.Distance(_manager.userHead.position, _target.position)
+                : float.PositiveInfinity;
+        }
+
+        public float GetLeftHandDistanceToThisObject()
+        {
+            return HasLeftHand() && _target != null
+                ? Vector3.Distance(_manager.userLeftHand.position, _target.position)
+                : float.PositiveInfinity;
+        }
+
+        public float GetRightHandDistanceToThisObject()
+        {
+            return HasRightHand() && _target != null
+                ? Vector3.Distance(_manager.userRightHand.position, _target.position)
+                : float.PositiveInfinity;
+        }
+
+        public float GetNearestHandDistanceToThisObject()
+        {
+            return Mathf.Min(GetLeftHandDistanceToThisObject(), GetRightHandDistanceToThisObject());
+        }
+
+        public float GetHandDistance()
+        {
+            return HasHands()
+                ? Vector3.Distance(_manager.userLeftHand.position, _manager.userRightHand.position)
+                : float.PositiveInfinity;
+        }
+
+        public bool IsHandsClose(float distance = 0.12f)
+        {
+            return GetHandDistance() <= Mathf.Max(0.001f, distance);
+        }
+
+        public bool AreHandsClose(float distance = 0.12f) => IsHandsClose(distance);
+
+        public bool IsHeadCloseToThisObject(float distance = 1f)
+        {
+            return GetHeadDistanceToThisObject() <= Mathf.Max(0.001f, distance);
+        }
+
+        public bool IsLeftHandCloseToThisObject(float distance = 0.25f)
+        {
+            return GetLeftHandDistanceToThisObject() <= Mathf.Max(0.001f, distance);
+        }
+
+        public bool IsRightHandCloseToThisObject(float distance = 0.25f)
+        {
+            return GetRightHandDistanceToThisObject() <= Mathf.Max(0.001f, distance);
+        }
+
+        public bool IsAnyHandCloseToThisObject(float distance = 0.25f)
+        {
+            return GetNearestHandDistanceToThisObject() <= Mathf.Max(0.001f, distance);
+        }
+
+        public bool IsClose(float distance = 1f) => IsHeadCloseToThisObject(distance);
+
+        public float MapHeadDistanceToThisObject(float nearDistance, float farDistance, float nearValue, float farValue)
+        {
+            return MapRange(GetHeadDistanceToThisObject(), nearDistance, farDistance, nearValue, farValue);
+        }
+
+        public float MapNearestHandDistanceToThisObject(float nearDistance, float farDistance, float nearValue, float farValue)
+        {
+            return MapRange(GetNearestHandDistanceToThisObject(), nearDistance, farDistance, nearValue, farValue);
+        }
+
+        public float MapHandDistance(float nearDistance, float farDistance, float nearValue, float farValue)
+        {
+            return MapRange(GetHandDistance(), nearDistance, farDistance, nearValue, farValue);
+        }
+
+        private static float MapRange(float value, float inMin, float inMax, float outMin, float outMax)
+        {
+            if (float.IsInfinity(value) || float.IsNaN(value))
+                return outMin;
+
+            float t = Mathf.InverseLerp(inMin, inMax, value);
+            return Mathf.Lerp(outMin, outMax, t);
         }
     }
 
@@ -693,20 +1115,125 @@ public class IoTProxy
         manager = m;
     }
 
-    public void On(string id)
+    public bool On(string id)
     {
-        manager?.TurnOn(id);
+        if (manager == null)
+            return false;
+
+        var result = manager.TurnOn(id);
+        return result == IoTCommandResult.Success || result == IoTCommandResult.NoStateChange;
     }
 
-    public void Off(string id)
+    public bool Off(string id)
     {
-        manager?.TurnOff(id);
+        if (manager == null)
+            return false;
+
+        var result = manager.TurnOff(id);
+        return result == IoTCommandResult.Success || result == IoTCommandResult.NoStateChange;
     }
 
-    public void Send(string id, string cmd)
+    public string Send(string id, string cmd)
     {
-        manager?.SendCommand(id, cmd);
+        return manager != null
+            ? manager.SendCommand(id, cmd).ToString()
+            : IoTCommandResult.DeviceNotFound.ToString();
     }
+
+    public LightBulbProxy LightBulb(string id)
+    {
+        return new LightBulbProxy(manager, id);
+    }
+
+    public LightBulbProxy Lightbuld(string id)
+    {
+        return LightBulb(id);
+    }
+
+    public string SetRGB(string id, double red, double green, double blue)
+    {
+        return manager != null
+            ? manager.SetLightBulbRGB(id, red, green, blue).ToString()
+            : IoTCommandResult.DeviceNotFound.ToString();
+    }
+
+    public string setRGB(string id, double red, double green, double blue) => SetRGB(id, red, green, blue);
+
+    public string SetRed(string id, double red)
+    {
+        return manager != null
+            ? manager.SetLightBulbRed(id, red).ToString()
+            : IoTCommandResult.DeviceNotFound.ToString();
+    }
+
+    public string setRed(string id, double red) => SetRed(id, red);
+
+    public string SetGreen(string id, double green)
+    {
+        return manager != null
+            ? manager.SetLightBulbGreen(id, green).ToString()
+            : IoTCommandResult.DeviceNotFound.ToString();
+    }
+
+    public string setGreen(string id, double green) => SetGreen(id, green);
+
+    public string SetBlue(string id, double blue)
+    {
+        return manager != null
+            ? manager.SetLightBulbBlue(id, blue).ToString()
+            : IoTCommandResult.DeviceNotFound.ToString();
+    }
+
+    public string setBlue(string id, double blue) => SetBlue(id, blue);
+}
+
+[MoonSharpUserData]
+public class LightBulbProxy
+{
+    private readonly IOTManager manager;
+    private readonly string id;
+
+    public LightBulbProxy(IOTManager manager, string id)
+    {
+        this.manager = manager;
+        this.id = id;
+    }
+
+    public string SetRGB(double red, double green, double blue)
+    {
+        return manager != null
+            ? manager.SetLightBulbRGB(id, red, green, blue).ToString()
+            : IoTCommandResult.DeviceNotFound.ToString();
+    }
+
+    public string setRGB(double red, double green, double blue) => SetRGB(red, green, blue);
+
+    public string SetRed(double red)
+    {
+        return manager != null
+            ? manager.SetLightBulbRed(id, red).ToString()
+            : IoTCommandResult.DeviceNotFound.ToString();
+    }
+
+    public string setRed(double red) => SetRed(red);
+
+    public string SetGreen(double green)
+    {
+        return manager != null
+            ? manager.SetLightBulbGreen(id, green).ToString()
+            : IoTCommandResult.DeviceNotFound.ToString();
+    }
+
+    public string setGreen(double green) => SetGreen(green);
+
+    public string SetBlue(double blue)
+    {
+        return manager != null
+            ? manager.SetLightBulbBlue(id, blue).ToString()
+            : IoTCommandResult.DeviceNotFound.ToString();
+    }
+
+    public string setBlue(double blue) => SetBlue(blue);
 }
 
 
@@ -724,9 +1251,41 @@ public class PokeButtonProxy
     public bool is_pressed => _btn != null && _btn.IsPressed;
     public bool pressed_this_frame => _btn != null && _btn.WasPressedThisFrame;
     public bool released_this_frame => _btn != null && _btn.WasReleasedThisFrame;
+    public bool clicked_this_frame => _btn != null && _btn.WasClickedThisFrame;
 
-    // ✅ Toggle mode
     public bool toggle => _btn != null && _btn.ToggleState;
+    public bool toggle_mode => _btn != null && _btn.ToggleMode;
+
+    public bool IsPressed()
+    {
+        return _btn != null && _btn.IsPressed;
+    }
+
+    public bool WasPressed()
+    {
+        return _btn != null && _btn.WasPressedThisFrame;
+    }
+
+    public bool WasReleased()
+    {
+        return _btn != null && _btn.WasReleasedThisFrame;
+    }
+
+    public bool WasClicked()
+    {
+        return _btn != null && _btn.WasClickedThisFrame;
+    }
+
+    public bool GetToggleState()
+    {
+        return _btn != null && _btn.ToggleState;
+    }
+
+    public void SetToggleMode(bool enabled)
+    {
+        if (_btn != null)
+            _btn.SetToggleMode(enabled);
+    }
 }
 
 
@@ -760,6 +1319,72 @@ public class PokeButtonProxy
                 ? _other.transform.root.name
                 : "";
 
+        public string GetRuntimeName()
+            => _other != null ? _other.name : "";
+
+        public string GetObjectId()
+        {
+            var iot = GetIOTObject();
+            if (iot != null)
+                return iot.DeviceId;
+
+            var po = GetProgramableObject();
+            if (po != null && !string.IsNullOrWhiteSpace(po.id))
+                return po.id;
+
+            return GetRootName();
+        }
+
+        public string GetDisplayLabel()
+        {
+            var iot = GetIOTObject();
+            if (iot != null)
+                return iot.DisplayName;
+
+            var po = GetProgramableObject();
+            if (po != null && po.TextBox != null && !string.IsNullOrWhiteSpace(po.TextBox.text))
+                return po.TextBox.text.Trim();
+
+            if (po != null && po.shape != null && !string.IsNullOrWhiteSpace(po.shape.name))
+                return po.shape.name.Trim();
+
+            return GetRootName();
+        }
+
+        public string GetIdentityText()
+        {
+            return $"{GetObjectId()} {GetDisplayLabel()} {GetRuntimeName()} {GetRootName()}";
+        }
+
+        public bool Matches(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return false;
+
+            string needle = NormalizeIdentity(query);
+            if (string.IsNullOrEmpty(needle))
+                return false;
+
+            return IdentityMatches(GetObjectId(), needle) ||
+                   IdentityMatches(GetDisplayLabel(), needle) ||
+                   IdentityMatches(GetIOTDeviceId(), needle) ||
+                   IdentityMatches(GetIOTDisplayName(), needle) ||
+                   IdentityMatches(GetRuntimeName(), needle) ||
+                   IdentityMatches(GetRootName(), needle);
+        }
+
+        public string GetIOTDeviceId()
+        {
+            var iot = GetIOTObject();
+            return iot != null ? iot.DeviceId : "";
+        }
+
+        public string GetIOTDisplayName()
+        {
+            var iot = GetIOTObject();
+            return iot != null ? iot.DisplayName : "";
+        }
+
         // -----------------------------
         // Physics-like data (not available)
         // Return safe defaults
@@ -791,6 +1416,38 @@ public class PokeButtonProxy
             }
 
             return null;
+        }
+
+        private ProgramableObject GetProgramableObject()
+        {
+            if (_other == null)
+                return null;
+
+            return _other.GetComponentInParent<ProgramableObject>();
+        }
+
+        private IOTobject GetIOTObject()
+        {
+            if (_other == null)
+                return null;
+
+            return _other.GetComponentInParent<IOTobject>();
+        }
+
+        private static bool IdentityMatches(string value, string normalizedNeedle)
+        {
+            string normalizedValue = NormalizeIdentity(value);
+            return !string.IsNullOrEmpty(normalizedValue) &&
+                   (normalizedValue == normalizedNeedle ||
+                    normalizedValue.StartsWith(normalizedNeedle + "_") ||
+                    normalizedValue.Contains(normalizedNeedle));
+        }
+
+        private static string NormalizeIdentity(string value)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? ""
+                : value.Trim().Replace(' ', '_').ToUpperInvariant();
         }
     }
 

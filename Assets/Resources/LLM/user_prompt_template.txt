@@ -1,6 +1,7 @@
 Task: Generate Lua that controls a Unity GameObject using MoonSharp proxies.
 
-GameObject display name: {OBJECT_NAME}
+TARGET RUNTIME NAME: {TARGET_RUNTIME_NAME}
+TARGET DISPLAY LABEL: {TARGET_DISPLAY_LABEL}
 
 SCENE_CONTEXT:
 {SCENE_CONTEXT}
@@ -14,13 +15,91 @@ CURRENT_LUA:
 AVAILABLE_IOT_DEVICES:
 {IOT_DEVICES}
 
+LIVE_OBJECT_REGISTRY:
+{LIVE_OBJECT_REGISTRY}
+
+--------------------------------------------------
+INTENT CHECKLIST (reason internally only)
+--------------------------------------------------
+Before writing Lua, determine:
+
+1. TARGET:
+   Which selected object receives this script?
+
+2. TRIGGER:
+   What causes the behavior?
+   Examples: start, button press, button release, collision, trigger entry, proximity, continuous update.
+
+3. CONDITION:
+   Which object, device, state, or name must match?
+
+4. ACTION:
+   What should happen?
+
+5. PARAMETERS:
+   Device ID, direction, force, duration, color, scale, speed, or other values.
+
+6. REPETITION:
+   Should the action happen once, on every entry, while held, or continuously?
+
+7. STOP OR REVERSE:
+   What should happen when the trigger ends?
+
+The checklist is for reasoning only. Output Lua code only.
+
+--------------------------------------------------
+INTERPRETATION RULES
+--------------------------------------------------
+- Do not add animation, physics, particles, color changes, sound, or IoT unless requested.
+- Do not turn a one-time event into continuous update logic.
+- Do not infer toggle behavior when the user says "turn on."
+- Do not infer "turn off on release" unless the user requests it.
+- If the user mentions button, buttons, poke, press, click, or tap, this means button interaction and takes priority over generic hand-touch/proximity.
+- If PRIMARY TARGET says "Button proxy available: true", then "touch it", "touch this", "touch this object", "poke it", "press it", "click it", or "tap it" should use self.button/self.poke button APIs.
+- If the user says "I touch", "when I touch", "my hand touches", "hand touches", or "finger touches" without mentioning button/poke/press/click/tap and PRIMARY TARGET is not a button target, this means user hand touch/proximity, NOT object collision.
+- When the user says "this object," it means the primary target.
+- Other selected objects are context or collision references unless the user explicitly says all, every, each, both, selected objects, or entire group.
+- SCENE LUA SCRIPT CONTEXT lists existing scripts already running in the scene. Use it to avoid conflicting IoT/object control.
+- If another script already continuously controls the same IoT device/object, avoid adding a second continuous controller unless the user clearly asks for another rule.
+- Single-object generation may only replace the PRIMARY TARGET script. Do not claim to edit other scripts unless group/batch generation is explicitly requested by the system.
+- If PRIMARY TARGET says "Global environment controller: true", treat the prompt as a room/environment rule hosted on that controller.
+- If User intent begins with "SYSTEM-GENERATED GLOBAL RULE", that prefix was added by the system; follow it as higher-priority context and treat "USER REQUEST" as the user's original words.
+- For a global environment controller, do not assume self.programable:IsTouching() refers to named furniture like desk/table/lamp; it only refers to the controller object itself.
+- Use LIVE_OBJECT_REGISTRY to determine whether a named target is a REAL OBJECT or VIRTUAL OBJECT before choosing scene:FindRealObject, scene:FindVirtualObject, or scene:FindObject.
+- For global environment controller prompts that mention another scene object by name, use scene:FindObject(name), scene:FindVirtualObject(name), or scene:FindRealObject(name); do not pretend the controller itself is that object.
+- If the prompt says the selected button/controller should affect another named object, keep button logic on self.button and control the other object through scene:FindObject(name).
+- If the user asks for breathing/pulsing/scaling/size changes and says a light/device follows the size, this is continuous update logic, NOT collision. Keep on_collision empty unless user explicitly says hit/collide.
+- If the user says clap/clapping/hands together/two hands close to each other/hands get close, this means distance between the user's two hands. Use user:IsHandsClose(threshold) or user:GetHandDistance() in update with transition state; do NOT use object touch, hand-to-object proximity, or collision.
+- If the user says they are close/near/approaching a named object like table/desk/sofa/lamp, find that object with scene:FindRealObject(name) or scene:FindObject(name), get user:GetHeadPosition(), get the target transform position, and calculate distance manually in Lua. Do NOT use user:IsHeadCloseToThisObject unless the prompt says this object.
+- If the user asks for one object's size or the distance between two objects to control color, volume, IoT, light, animation speed, or any continuous value, use update(self, deltaTime), scene lookup, TransformProxy.position/localScale, and manual Lua math. This works for real and virtual objects; choose FindRealObject or FindVirtualObject from LIVE_OBJECT_REGISTRY.
+
 --------------------------------------------------
 IOT
 --------------------------------------------------
 - You may use iot:On(id) or iot:Off(id)
-- Only use IDs from the list
+- You may use iot:Send(id, command) for supported non-ON/OFF commands
+- For light bulb RGB, prefer the special cached API when multiple scripts or multiple objects control separate RGB channels:
+  local bulb = iot:LightBulb("BULB01")
+  bulb:SetRGB(r, g, b)
+  bulb:SetRed(r)
+  bulb:SetGreen(g)
+  bulb:SetBlue(b)
+- The special light bulb API stores the other RGB channels globally in IOTManager and sends one full RGB URL, so separate scripts can safely control red/green/blue without overwriting each other.
+- You may also call iot:SetRGB("BULB01", r, g, b), iot:SetRed("BULB01", r), iot:SetGreen("BULB01", g), or iot:SetBlue("BULB01", b).
+- Only use IDs from AVAILABLE_IOT_DEVICES
+- Only use commands supported by that device
+- For TV devices, possible listed commands may include NEXT, PREVIOUS, VOLUME:0.5, CHANNEL:1
+- For speaker devices, possible listed commands may include NEXT and VOLUME:0.5
+- For light bulb devices, possible listed commands may include TOGGLE, RGB:255:0:0, HSV:120:100:100, BRIGHTNESS:75, TEMPERATURE:3500, STATE, DISCOVER
+- If the prompt says room/environment color, or "make this room blue/red/green/etc.", choose a listed device that supports RGB or HSV and send a color command. Do not choose an ON/OFF-only lamp/plug for color.
+- If the prompt says room/environment darker/brighter/dim/bright, choose a listed device that supports BRIGHTNESS and send a brightness command. Do not choose an ON/OFF-only lamp/plug for brightness.
+- If multiple lights exist, prefer the device whose type/display name/ID says bulb/color/RGB for color or brightness, and prefer lamp/plug only for plain on/off requests.
 - Only use IoT if user intent clearly involves real-world device control
 - If no relevant device exists, do not use iot
+- Never send IoT commands continuously every frame
+- For analog controls like volume, rate-limit by value change; do not send every frame if the mapped value has barely changed
+- For button holds, call IoT only on press/release transitions
+- For collisions, call IoT only on collision entry unless repeated behavior is explicitly requested
 
 --------------------------------------------------
 CONTRACT (required)
@@ -30,17 +109,143 @@ function update(self, deltaTime)
 function on_trigger(self, other)
 function on_collision(self, col)
 
+Your output MUST include all four exact lowercase global function declarations above, even when a function body is empty.
+Do not return a snippet, JSON, markdown, or only the changed lines.
+
+Required skeleton:
+
+function start(self)
+end
+
+function update(self, deltaTime)
+end
+
+function on_trigger(self, other)
+end
+
+function on_collision(self, col)
+end
+
 --------------------------------------------------
 PROXY USAGE
 --------------------------------------------------
 - Only use provided proxies (transform, rigidbody, particles, etc.)
 - NEVER call Unity APIs like GetComponent, AddComponent, etc.
 - Use proxy properties, not SetX methods
+- Use scene:FindObject("ObjectName") or world:FindObject("ObjectName") to control another selected/registered object from this script.
+- scene:FindObject returns a GameObjectProxy. Use GetTransformProxy(), GetRigidbodyProxy(), SetColor(), SetColorHex(), SetActive(), or GetProgramableObjectProxy().
+- Always nil-check scene lookup results before using them.
 
 Transform example:
 local p = self.transform.position
 p.y = p.y + 1
 self.transform.position = {x=p.x,y=p.y,z=p.z}
+
+Cross-object physics example:
+local target = scene:FindObject("Sphere_1")
+if target then
+    local rb = target:GetRigidbodyProxy()
+    if rb then
+        rb:SetIsKinematic(false)
+        rb:SetUseGravity(true)
+    end
+end
+
+--------------------------------------------------
+HAND TOUCH, USER PROXIMITY, AND COLOR
+--------------------------------------------------
+- If the user asks to touch, poke, press, click, or tap a button, or PRIMARY TARGET says "Button proxy available: true" and the user says "touch it/this/object", use self.button/self.poke button APIs such as WasPressed(), WasReleased(), WasClicked(), or IsPressed(); do NOT use user:IsAnyHandCloseToThisObject for button intent.
+- If the user asks about touching, hand touch, proximity, hand near, or poke-by-hand, use ProgramableObject touch state when available:
+  local touching = self.programable and self.programable:IsTouching()
+- If the user says "I touch it" or "when I touch this object", prefer:
+  local touching = user and user:IsAnyHandCloseToThisObject(0.25)
+- Put "I touch" / hand-touch behavior in update(self, deltaTime), not on_collision(self, col).
+- For one-shot touch behavior, track transitions with self.wasTouching in update.
+- If the user asks when "I am close", "user is close", "approach", "near this object", or "close to the lamp/object", use head-distance proximity:
+  local close = user and user:IsHeadCloseToThisObject(1.0)
+- You may also use self.programable:IsUserClose(1.0) when the selected object has ProgramableObject.
+- For one-shot user approach behavior, track transitions with self.wasClose in update.
+- If the user says close/near/approach a named scene object and not "this object", use scene lookup and manual distance:
+  local target = scene:FindRealObject("Table") or scene:FindObject("Table")
+  local head = user and user:GetHeadPosition()
+  local t = target and target:GetTransformProxy()
+  local p = t and t.position
+  local close = false
+  if head and p then
+      local dx = head.x - p.x
+      local dy = head.y - p.y
+      local dz = head.z - p.z
+      close = math.sqrt(dx*dx + dy*dy + dz*dz) <= 1.0
+  end
+- If the user asks for distance between hands, hands apart/together, or two-hand control, use user:GetHandDistance() or user:MapHandDistance(near, far, nearValue, farValue).
+- If the user asks for a clap, hands together, or two hands close to each other, use user:IsHandsClose(0.12) or user:GetHandDistance() <= 0.12 and track self.wasClapping so IoT fires once when hands become close.
+- If the user asks for head distance mapped to a value, use user:MapHeadDistanceToThisObject(near, far, nearValue, farValue).
+- For continuous IoT volume from hand/head distance, send iot:Send(id, "VOLUME:" .. tostring(value)) only when the value changes meaningfully, such as math.abs(value - self.lastVolume) > 0.05.
+- For color changes on generated/programmable objects, use self.programable:SetColor(r,g,b,a) or self.programable:SetColorHex("#RRGGBB").
+- For visible animation/scale/rotation on generated/programmable objects, prefer self.shape over self.transform. For real room objects, self.shape is the generated BoundsCube proxy.
+- For outline control, use self.programable:SetOutline(true/false), OutlineOn(), or OutlineOff().
+- Do NOT use self.transform:SetColor; Transform has no color method.
+- Do NOT access isToching directly; use self.programable:IsTouching() or self.programable:GetIsTouching().
+- Do NOT use hand touch for "user is close" unless the user specifically says hand/finger/touch.
+- Do NOT implement "I touch" using on_collision, col:Matches, hits, or collides.
+- Do NOT implement clap using on_collision, col:Matches, self.programable:IsTouching(), or user:IsAnyHandCloseToThisObject().
+
+Clap example:
+function start(self)
+    self.wasClapping = false
+end
+
+function update(self, deltaTime)
+    local clapping = user and user:IsHandsClose(0.12)
+    if clapping and not self.wasClapping then
+        iot:On("TV01")
+    end
+    self.wasClapping = clapping
+end
+
+--------------------------------------------------
+OBJECT SIZE / OBJECT DISTANCE CONTROL
+--------------------------------------------------
+- For object-to-object distance, use scene lookup for both objects, TransformProxy.position, and manual dx/dy/dz distance math.
+- For object size, use TransformProxy.localScale. Use average scale such as (s.x + s.y + s.z) / 3 when the prompt says general size.
+- For real furniture/physical anchors use scene:FindRealObject(name); for spawned/generated objects use scene:FindVirtualObject(name); if unsure use scene:FindObject(name).
+- For continuous color, map a 0..1 value to RGB and call SetColor or SetColorHex only when needed.
+- For continuous speaker/TV volume, map to 0..1 and send iot:Send(id, "VOLUME:" .. tostring(value)) only when the value changes meaningfully.
+- For continuous light bulb color, map values to 0..255 and prefer iot:LightBulb(id):SetRGB(r,g,b) or SetRed/SetGreen/SetBlue when individual objects control individual channels. Only send when color changes meaningfully.
+- For continuous light bulb brightness, map values to 0..100 and send iot:Send(id, "BRIGHTNESS:" .. tostring(value)) only when brightness changes meaningfully.
+- For threshold light behavior, track self.wasAboveThreshold or self.lightOn so iot:On/Off fires only when crossing the threshold.
+- Keep on_collision empty unless the user explicitly says hit/collide.
+
+Object distance example:
+local a = scene:FindRealObject("Desk") or scene:FindObject("Desk")
+local b = scene:FindVirtualObject("Sphere") or scene:FindObject("Sphere")
+local at = a and a:GetTransformProxy()
+local bt = b and b:GetTransformProxy()
+local ap = at and at.position
+local bp = bt and bt.position
+if ap and bp then
+    local dx = ap.x - bp.x
+    local dy = ap.y - bp.y
+    local dz = ap.z - bp.z
+    local distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+    local value = math.max(0, math.min(1, 1 - ((distance - 0.2) / 2.0)))
+end
+
+Object size example:
+local target = scene:FindVirtualObject("Sphere") or scene:FindObject("Sphere")
+local t = target and target:GetTransformProxy()
+local s = t and t.localScale
+if s then
+    local size = (s.x + s.y + s.z) / 3
+end
+
+--------------------------------------------------
+BREATHING, SIZE-FOLLOWING, AND IOT
+--------------------------------------------------
+- For breathing/pulsing/size-following behavior, implement the scale animation and IoT threshold checks in update(self, deltaTime).
+- Do NOT use on_collision or col:Matches for prompts like "make it breathe and the light turns on/off following the size."
+- Track state such as self.direction and self.lightOn so IoT only fires when crossing large/small thresholds, not every frame.
+- Example logic: expand until max scale, turn lamp on once, shrink until min scale, turn lamp off once.
 
 --------------------------------------------------
 COLLISION
@@ -50,16 +255,27 @@ COLLISION
   1) Unity physics collisions
   2) Custom bounds collisions (CollisionManager + SimpleCollidable)
 - Lua always receives: on_collision(self, col)
-- Use col:GetRootName() for the other object
+- Prefer col:Matches("name or label") for collision target checks
+- Runtime GameObject names may be generic, such as ProgramableObject_Virtual
+- Never use ProgramableObject_Virtual, ProgramableObject_Real, or ProgramableObject_* as a col:Matches target
+- Never use long internal generated object IDs as col:Matches targets; use human terms like Sphere, Cube, or the visible label
+- If the user says anything, something, any object, or does not name the collided object, do not call col:Matches; run the collision action unconditionally
+- col:Matches checks the other object's IoT DeviceId, IoT display name, object ID, display label, runtime name, and root name
+- For IoT objects, prefer matching by IoT display name or DeviceId
+- Use col:GetDisplayLabel(), col:GetObjectId(), or col:GetIdentityText() for debugging/inspection
 - NEVER rely on exact equality
-- Use prefix or pattern matching
+- Use prefix/pattern matching only if col:Matches is not enough
 - Do NOT rely on contact-point / normal / relative-velocity data
   (bounds collisions do not provide real contact information)
 
 Example:
-local other = col:GetRootName()
-if string.match(other, "^DESK") then
+if col:Matches("Desk") then
     if self.particles then self.particles:Play() end
+end
+
+Example for "hits something" or "collides with anything":
+function on_collision(self, col)
+    iot:Off("LAMP01")
 end
 
 
@@ -70,7 +286,7 @@ Only use if user explicitly requests animation or movement.
 
 Examples:
 dotween:MoveTo(self.transform, 0,1,0, 1.0, "OutQuad")
-dotween:ScaleTo(self.transform, 1.2,1.2,1.2, 0.5, "InOutSine")
+dotween:ScaleTo(self.shape, 1.2,1.2,1.2, 0.5, "InOutSine")
 
 Create tweens in start or on_trigger, not every frame.
 
@@ -86,6 +302,8 @@ EDIT-IN-PLACE
 If CURRENT_LUA is not empty:
 - Modify it instead of rewriting from scratch
 - Preserve existing logic unless user intent changes it
+- If the new user intent changes the collision target or condition, update the on_collision condition accordingly
+- If the user names a specific collided object, do not keep old unconditional on_collision logic
 
 --------------------------------------------------
 OUTPUT RULES

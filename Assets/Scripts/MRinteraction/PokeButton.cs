@@ -15,6 +15,7 @@ public class PokeButton : MonoBehaviour
     public bool clickOnPress = false;
     public float minPressTime = 0f;
     public float debounce = 0.12f;
+    [SerializeField] private bool toggleMode = true;
 
     [Header("Optional Visual Press")]
     public Transform visualTarget;
@@ -24,13 +25,16 @@ public class PokeButton : MonoBehaviour
     // ✅ Lua-visible state
     public bool IsPressed => _isPressed;
     public bool ToggleState => _toggleState;
+    public bool ToggleMode => toggleMode;
 
     public bool WasPressedThisFrame => _pressedThisFrame;
     public bool WasReleasedThisFrame => _releasedThisFrame;
+    public bool WasClickedThisFrame => _clickedThisFrame;
 
     private bool _toggleState;
     private bool _pressedThisFrame;
     private bool _releasedThisFrame;
+    private bool _clickedThisFrame;
 
     private PokeInteractable _poke;
     private bool _isPressed;
@@ -57,6 +61,7 @@ public class PokeButton : MonoBehaviour
     {
         _pressedThisFrame = false;
         _releasedThisFrame = false;
+        _clickedThisFrame = false;
     }
 
     private void Update()
@@ -127,10 +132,18 @@ public class PokeButton : MonoBehaviour
         if (Time.time - _lastClickTime < debounce) return;
 
         _lastClickTime = Time.time;
+        _clickedThisFrame = true;
 
-        // ✅ toggle mode built-in
-        _toggleState = !_toggleState;
+        if (toggleMode)
+            _toggleState = !_toggleState;
 
         onClick?.Invoke();
+    }
+
+    public void SetToggleMode(bool enabled)
+    {
+        toggleMode = enabled;
+        if (!toggleMode)
+            _toggleState = false;
     }
 }

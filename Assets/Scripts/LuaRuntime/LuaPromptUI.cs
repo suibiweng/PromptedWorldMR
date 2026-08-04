@@ -16,7 +16,11 @@ public class LuaPromptUI : MonoBehaviour
 
     [Header("Options")]
     [SerializeField] private Toggle autoApplyToggle;
+    [Tooltip("If on, generated Lua starts playing immediately after it is applied. If off, Lua is assigned but stopped.")]
+    [SerializeField] private Toggle playOnGenerateToggle;
+    [Tooltip("Legacy alias for Play On Generate. Prefer playOnGenerateToggle.")]
     [SerializeField] private Toggle callStartToggle;
+    [SerializeField] private Toggle applyToAllSelectedToggle;
 
     [Header("Buttons")]
     [SerializeField] private Button selectTargetButton;
@@ -25,12 +29,15 @@ public class LuaPromptUI : MonoBehaviour
     [Header("Play / Stop Lua")]
     [SerializeField] private Button playLuaButton;
     [SerializeField] private Button stopLuaButton;
+    [SerializeField] private Button deleteObjectButton;
 
     [Header("Status")]
     [SerializeField] private TMP_Text statusText;
+    [SerializeField] private TMP_Text selectedObjectNameText;
 
     [Header("Selection")]
     [SerializeField] private GameObject currentTarget;
+    private bool explicitTargetPicked;
 
     [Header("World References")]
     public PromptedWorldManager pwm;
@@ -54,7 +61,13 @@ public class LuaPromptUI : MonoBehaviour
             playLuaButton.onClick.AddListener(PlaySelectedLua);
         if (stopLuaButton)
             stopLuaButton.onClick.AddListener(StopSelectedLua);
+        if (deleteObjectButton)
+            deleteObjectButton.onClick.AddListener(DeleteSelectedVirtualObjects);
 
+        InitializePlayOnGenerateToggle();
+        if (playOnGenerateToggle)
+            playOnGenerateToggle.onValueChanged.AddListener(SetPlayOnGenerate);
+        UpdateSelectedObjectNameDisplay(currentTarget);
         UpdateStatus("Select one or more objects (click or lasso), then press Start.");
 
         Debug.Log($"[LuaPromptUI] Awake. pwm={pwm}, generator={generator}, lassoSelector={lassoSelector}");
@@ -71,12 +84,16 @@ public class LuaPromptUI : MonoBehaviour
             return;
         }
 
+        var programableObject = go.GetComponentInParent<ProgramableObject>();
+        if (programableObject != null)
+            go = programableObject.gameObject;
+
         SetTarget(go);
+        explicitTargetPicked = true;
 
         if (pwm != null)
         {
-            // Legacy single-selection path
-            pwm.setSelectedObject(go);
+            pwm.SetPrimarySelectedObject(go);
         }
     }
 
@@ -91,10 +108,12 @@ public class LuaPromptUI : MonoBehaviour
             if (objectNameInput)
                 objectNameInput.text = currentTarget.name;
 
+            UpdateSelectedObjectNameDisplay(currentTarget);
             UpdateStatus($"Target selected: {currentTarget.name}. Now press Start.");
         }
         else
         {
+            UpdateSelectedObjectNameDisplay(null);
             UpdateStatus("No target selected.");
         }
     }
@@ -120,6 +139,8 @@ public class LuaPromptUI : MonoBehaviour
         List<GameObject> group = new List<GameObject>();
         HashSet<GameObject> seen = new HashSet<GameObject>();
         GameObject mainTarget = null;
+        GameObject firstLassoTarget = null;
+        GameObject lastClickTarget = null;
 
         // 1) Lasso selection
         if (lassoSelector != null)
@@ -133,6 +154,8 @@ public class LuaPromptUI : MonoBehaviour
                     if (go != null && seen.Add(go))
                     {
                         group.Add(go);
+                        if (firstLassoTarget == null)
+                            firstLassoTarget = go;
                     }
                 }
             }
@@ -151,22 +174,39 @@ public class LuaPromptUI : MonoBehaviour
                     {
                         group.Add(go);
                     }
+
+                    if (go != null)
+                        lastClickTarget = go;
                 }
             }
         }
 
-        // Decide mainTarget from group, if any
-        if (group.Count > 0)
+        // 3) Primary target priority:
+        // explicit picked target, latest clicked PWM target, last click-selection item,
+        // then first lasso object as a final fallback.
+        if (explicitTargetPicked && currentTarget != null)
         {
-            mainTarget = group[0];
+            mainTarget = currentTarget;
+            if (seen.Add(mainTarget))
+                group.Add(mainTarget);
         }
 
-        // 3) If no group, try PromptedWorldManager.selectedObject
-        if (mainTarget == null && pwm != null && pwm.selectedObject != null)
+        if (mainTarget == null && pwm != null && pwm.selectedObject != null &&
+            (group.Count == 0 || group.Contains(pwm.selectedObject)))
         {
             mainTarget = pwm.selectedObject;
             if (!seen.Contains(mainTarget))
                 group.Add(mainTarget);
+        }
+
+        if (mainTarget == null && lastClickTarget != null)
+        {
+            mainTarget = lastClickTarget;
+        }
+
+        if (mainTarget == null && firstLassoTarget != null)
+        {
+            mainTarget = firstLassoTarget;
         }
 
         // 4) If still nothing, try whatever the UI last picked
@@ -215,6 +255,7 @@ public class LuaPromptUI : MonoBehaviour
         }
 
         currentTarget = mainTarget;
+        UpdateSelectedObjectNameDisplay(currentTarget);
 
         Debug.Log($"[LuaPromptUI] StartGeneration: mainTarget={currentTarget.name}, groupCount={group.Count}");
 
@@ -223,19 +264,11 @@ public class LuaPromptUI : MonoBehaviour
         // Keep PWM single-selection in sync for legacy flows
         if (pwm != null && pwm.selectedObject != currentTarget)
         {
-            pwm.setSelectedObject(currentTarget);
-        }
-
-        // Real-object tag for the prompt
-        string objectTag = "";
-        var progObj = currentTarget.GetComponent<ProgramableObject>();
-        if (progObj != null && progObj.isRealObject)
-        {
-            objectTag = "[This is a realobject] ";
+            pwm.SetPrimarySelectedObject(currentTarget);
         }
 
         // Push UI values into generator
-        generator.naturalLanguageIntent = objectTag + promptInput.text;
+        generator.naturalLanguageIntent = promptInput.text.Trim();
 
         if (objectNameInput)
             generator.objectDisplayName = objectNameInput.text;
@@ -257,11 +290,14 @@ public class LuaPromptUI : MonoBehaviour
         if (autoApplyToggle)
             generator.autoApplyToLuaBehaviour = autoApplyToggle.isOn;
 
-        if (callStartToggle)
-            generator.callStartAfterApply = callStartToggle.isOn;
+        generator.callStartAfterApply = GetPlayOnGenerateEnabled();
 
-        // 7) Configure group broadcast based on how many objects are selected
-        if (group.Count > 1)
+        // 7) Configure group broadcast only when explicitly requested.
+        bool applyToAllSelected = applyToAllSelectedToggle
+            ? applyToAllSelectedToggle.isOn
+            : IntentRequestsGroupBroadcast(promptInput.text);
+
+        if (group.Count > 1 && applyToAllSelected)
         {
             Debug.Log("[LuaPromptUI] Broadcasting Lua to group of " + group.Count + " objects.");
             generator.EnableGroupBroadcast(true);
@@ -276,6 +312,7 @@ public class LuaPromptUI : MonoBehaviour
 
         // Ensure target is set
         generator.AssignTarget(currentTarget);
+        generator.SetSelectedContext(currentTarget, group);
 
         UpdateStatus("Generating...");
         generator.GenerateLuaNow();
@@ -285,6 +322,42 @@ public class LuaPromptUI : MonoBehaviour
         {
             lassoSelector.BreakCurrentGroup();
         }
+    }
+
+    private void InitializePlayOnGenerateToggle()
+    {
+        Toggle toggle = playOnGenerateToggle != null ? playOnGenerateToggle : callStartToggle;
+        if (toggle == null || generator == null)
+            return;
+
+        toggle.isOn = generator.callStartAfterApply;
+
+        if (playOnGenerateToggle != null && callStartToggle != null && callStartToggle != playOnGenerateToggle)
+            callStartToggle.isOn = playOnGenerateToggle.isOn;
+    }
+
+    public void SetPlayOnGenerate(bool enabled)
+    {
+        if (generator != null)
+            generator.callStartAfterApply = enabled;
+
+        if (playOnGenerateToggle != null && playOnGenerateToggle.isOn != enabled)
+            playOnGenerateToggle.isOn = enabled;
+
+        if (callStartToggle != null && callStartToggle.isOn != enabled)
+            callStartToggle.isOn = enabled;
+    }
+
+    private bool GetPlayOnGenerateEnabled()
+    {
+        if (playOnGenerateToggle != null)
+        {
+            if (callStartToggle != null && callStartToggle != playOnGenerateToggle)
+                callStartToggle.isOn = playOnGenerateToggle.isOn;
+            return playOnGenerateToggle.isOn;
+        }
+
+        return callStartToggle == null || callStartToggle.isOn;
     }
 
     /// <summary>
@@ -385,6 +458,7 @@ public class LuaPromptUI : MonoBehaviour
         }
 
         currentTarget = mainTarget;
+        UpdateSelectedObjectNameDisplay(currentTarget);
         return true;
     }
 
@@ -442,6 +516,52 @@ public class LuaPromptUI : MonoBehaviour
             UpdateStatus($"Stop Lua on {mainTarget.name}.");
     }
 
+    private void DeleteSelectedVirtualObjects()
+    {
+        if (pwm == null)
+        {
+            UpdateStatus("PromptedWorldManager missing in scene.");
+            return;
+        }
+
+        GameObject mainTarget;
+        List<GameObject> group;
+
+        if (!TryBuildSelection(out mainTarget, out group))
+        {
+            UpdateStatus("Select at least one virtual object before Delete.");
+            Debug.LogWarning("[LuaPromptUI] DeleteSelectedVirtualObjects: no selection.");
+            return;
+        }
+
+        if (group.Count == 0 && mainTarget != null)
+            group.Add(mainTarget);
+
+        int deleted = 0;
+        foreach (var go in group)
+        {
+            if (pwm.DeleteVirtualObject(go))
+                deleted++;
+        }
+
+        if (deleted == 0)
+        {
+            UpdateStatus("No virtual programmable objects deleted. Real objects and global controllers are protected.");
+            return;
+        }
+
+        currentTarget = pwm.selectedObject;
+        explicitTargetPicked = currentTarget != null;
+        UpdateSelectedObjectNameDisplay(currentTarget);
+
+        if (generator != null && currentTarget != null)
+            generator.AssignTarget(currentTarget);
+
+        UpdateStatus(deleted == 1
+            ? "Deleted selected virtual object."
+            : $"Deleted {deleted} selected virtual objects.");
+    }
+
     private void BeginSelectTarget()
     {
         var picker = FindObjectOfType<RaycastTargetPicker>();
@@ -461,5 +581,41 @@ public class LuaPromptUI : MonoBehaviour
             statusText.text = msg;
         else
             Debug.Log("[LuaPromptUI] " + msg);
+    }
+
+    private void UpdateSelectedObjectNameDisplay(GameObject target)
+    {
+        if (!selectedObjectNameText)
+            return;
+
+        selectedObjectNameText.text = target
+            ? $"Selected: {GetDisplayName(target)}"
+            : "Selected: (none)";
+    }
+
+    private string GetDisplayName(GameObject target)
+    {
+        if (!target)
+            return "(none)";
+
+        var programableObject = target.GetComponentInParent<ProgramableObject>();
+        if (programableObject != null && programableObject.TextBox != null && !string.IsNullOrWhiteSpace(programableObject.TextBox.text))
+            return $"{programableObject.TextBox.text.Trim()} ({target.name})";
+
+        return target.name;
+    }
+
+    private bool IntentRequestsGroupBroadcast(string intent)
+    {
+        if (string.IsNullOrWhiteSpace(intent))
+            return false;
+
+        string normalized = " " + intent.Trim().ToLowerInvariant() + " ";
+        return normalized.Contains(" all ") ||
+               normalized.Contains(" every ") ||
+               normalized.Contains(" each ") ||
+               normalized.Contains(" both ") ||
+               normalized.Contains(" selected objects ") ||
+               normalized.Contains(" entire group ");
     }
 }

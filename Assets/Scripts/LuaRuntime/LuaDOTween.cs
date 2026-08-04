@@ -19,13 +19,19 @@ public class LuaDOTween
     static Transform From(TransformProxy tp)
     {
         if (tp == null) return null;
-        var f = typeof(TransformProxy).GetField("_transform", BindingFlags.Instance | BindingFlags.NonPublic);
+        var f = typeof(TransformProxy).GetField(
+            "_transform",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        );
         return (Transform)f?.GetValue(tp);
     }
     static GameObject From(GameObjectProxy gp)
     {
         if (gp == null) return null;
-        var f = typeof(GameObjectProxy).GetField("_gameObject", BindingFlags.Instance | BindingFlags.NonPublic);
+        var f = typeof(GameObjectProxy).GetField(
+            "_gameObject",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        );
         return (GameObject)f?.GetValue(gp);
     }
 
@@ -191,6 +197,26 @@ public class LuaDOTween
         return false;
     }
 
+    public void KillAll(bool complete = false)
+    {
+        foreach (var tw in _tweens.Values)
+        {
+            if (tw == null || !tw.IsActive()) continue;
+            if (complete) tw.Complete(true);
+            tw.Kill();
+        }
+
+        foreach (var seq in _seqs.Values)
+        {
+            if (seq == null || !seq.IsActive()) continue;
+            if (complete) seq.Complete(true);
+            seq.Kill();
+        }
+
+        _tweens.Clear();
+        _seqs.Clear();
+    }
+
     // =====================
     // Convenience overloads
     // =====================
@@ -262,9 +288,9 @@ public static class LuaDOTweenBootstrap
     ///     LuaDOTweenBootstrap.InjectInto(script);
     /// Ensures 'dotween' global is available in Lua.
     /// </summary>
-    public static void InjectInto(Script script)
+    public static LuaDOTween InjectInto(Script script)
     {
-        if (script == null) return;
+        if (script == null) return null;
 
         if (!_registered)
         {
@@ -274,6 +300,8 @@ public static class LuaDOTweenBootstrap
         }
 
         // Provide a fresh helper per Script
-        script.Globals["dotween"] = new LuaDOTween();
+        var helper = new LuaDOTween();
+        script.Globals["dotween"] = helper;
+        return helper;
     }
 }
